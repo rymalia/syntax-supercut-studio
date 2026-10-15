@@ -13,13 +13,14 @@ npm run build && node build   # production build via adapter-node
 
 There is no test suite. Verify changes with `npm run check` and by running a job through the UI (or `POST /api/jobs`) against real media.
 
-External runtime deps: `ffmpeg` on `PATH` (all rendering), `aubiopitch` on `PATH` (`/songify`), `XAI_API_KEY` (`/transcribe` STT and `/api/regex-suggest`). Requires Node 22+.
+External runtime deps: `ffmpeg` 7+ on `PATH` (all rendering; pipelines use the `-/filter_complex <file>` and `-fps_mode` forms, which ffmpeg 9 requires), `aubiopitch` on `PATH` (`/songify`), `XAI_API_KEY` (`/transcribe` STT and `/api/regex-suggest`). Requires Node 22+.
 
 ## Environment
 
 - `SYNTAX_BUCKETS_DIR` — bucket root (default `./videos`, gitignored; holds tens of GB of local media).
 - `SYNTAX_REPO_DIR` — `src/hooks.server.ts` hydrates any *unset* env vars from `<this>/.env` (default `../syntax-transcripts-2026/.env`) at boot. Local `.env` wins.
 - `DRAWTEXT_FONT` — font for debug text overlays; defaults to a macOS-only path (`/System/Library/Fonts/Supplemental/Arial Black.ttf`).
+- `TH_ENGINE_DIR` — live talking-heads engine directory (default `~/ResolveScripts/talking_heads`). See below.
 
 ## Architecture
 
@@ -33,7 +34,7 @@ SvelteKit (Svelte 5 runes) single-user local app. All heavy work is server-side 
 3. Pipelines in `src/lib/server/pipelines/` (`supercut`, `sentence`, `songify`, `transcribe`) stream progress through `onLog` and must honor `signal` — use `runFfmpeg(args, onLog, signal)` and `throwIfAborted(signal)` from `ffmpeg.ts`. A thrown `CancelledError` marks the job `cancelled` rather than `error`.
 4. `src/lib/JobPanel.svelte` polls `GET /api/jobs/[id]` (~1s) and cancels via `DELETE`. The GET derives a `mediaUrl` from `result.outFile` when that path lies inside a bucket — so pipelines that produce a video should return an absolute `outFile`.
 
-Adding a new job kind means touching: the pipeline module, the `JobKind`/`Job` union and a `start*` in `jobs.ts`, a `case` in `api/jobs/+server.ts`, and a route page.
+Long-running work (render, ingest) goes through this job flow; quick queries may call a pipeline or the engine synchronously from their own route (e.g. `api/engine/check`, `api/engine/grep`). Adding a new job kind means touching: the pipeline module, the `JobKind`/`Job` union and a `start*` in `jobs.ts`, a `case` in `api/jobs/+server.ts`, and a route page.
 
 **Shared render helpers**:
 - `hits.ts` `collectHits` — scans transcripts for a phrase (token-wise match after `text.ts` `normalize`) or a regex (matched against words joined by single spaces, then mapped back to word timings). Used by supercut, sentence, songify.
@@ -44,6 +45,23 @@ Adding a new job kind means touching: the pipeline module, the `JobKind`/`Job` u
 
 **Media serving**: `api/media/[bucket]/[kind]/[name]` supports `Range` requests so `<video>` can seek.
 
+## Talking-heads engine integration
+
+A separate Python engine (face/active-speaker analysis, person-bound "film" rendering) lives **outside this repo** at `TH_ENGINE_DIR`. The app talks to it only through `engine_cli.py`; `docs/ENGINE_CONTRACT.md` is the authoritative protocol (commands, RESULT shapes, film JSON, casting rules).
+
+- `src/lib/server/engine.ts` `runEngine(args, onLog, signal)` spawns `<TH_ENGINE_DIR>/asd/.venv/bin/python engine_cli.py ...`. stdout lines are `LOG <text>` (→ `onLog`) and exactly one final `RESULT <json>`; success requires exit 0 and `ok: true`. stderr is noise except its last ~40 lines on failure. Abort sends SIGTERM and rejects with `CancelledError`.
+- Job kinds `film-plan`, `film-render` (render then `qa`), `ingest` use the standard job flow. `/api/jobs/[id]` maps a `film-render` `outFile` under `films/out/` to an `/api/engine-media/...` URL.
+- Film scripts are `<TH_ENGINE_DIR>/films/<slug>.json`; `filmPath()` enforces slug `^[a-z0-9_-]+$`. `PUT /api/films/[slug]` writes via temp file + `rename` so a symlinked target can't redirect the write outside `films/`.
+- `/api/engine-media/[...path]` is a second read-only media root limited by `engineMediaPath()` to `identities/`, `proxy/`, `films/out/` (checked before and after `realpath`), with `Range` support.
+- UI: `/film` (script editor, casting, check/plan/render), `/people`, `/ingest`.
+- `engine/` in this repo is a **versioned snapshot** of the Python engine, not what runs; deploy a change by copying files into `TH_ENGINE_DIR`. Engine requirements (MPS torch, parakeet-mlx, whisper.cpp, Light-ASD/LR-ASD) are listed in `engine/README.md`.
+
 ## Style
 
-Design tokens and reusable classes live in `src/app.css`. Palette: `--bg` white, `--ink` near-black, single `--accent: #D0FE03`. Fonts: Unbounded (main), JetBrains Mono (logs/code). Separate sections with whitespace or 1px rules; status indicators are outlined/filled squares, not colored pills. The log panel is the primary inverted surface (black bg, accent text).
+Design tokens and reusable classes live in `src/app.css`. Use tokens, never hardcoded colors, so both themes work. Palette: `--bg` white, `--ink` near-black, single `--accent: #D0FE03`. Fonts: Unbounded (main), JetBrains Mono (logs/code). Separate sections with whitespace or 1px rules; status indicators are outlined/filled squares, not colored pills. The log panel is the primary inverted surface (black bg, accent text).
+
+**Theming:** light and dark themes switch on `data-theme` on `<html>`, set pre-paint by the inline script in `src/app.html` (localStorage `theme`, else `prefers-color-scheme`); the toggle in `+layout.svelte` has a CSS-driven label. Rules for new UI:
+- Text on an `--accent` background uses `--on-accent` (stays dark in both themes), not `--ink`.
+- Log panels and video/thumbnail backgrounds use `--well` (always near-black), not `--ink`.
+- An accent-filled container with mixed content can re-declare the light tokens locally (see `tr:hover td`).
+- Display headings with a `<mark>` overhang their `line-height: 1` box; leave clearance before following text (see `.hero h1`).
