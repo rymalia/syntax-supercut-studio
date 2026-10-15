@@ -10,6 +10,9 @@
 		{ href: '/songify', label: 'Songify' },
 		{ href: '/transcribe', label: 'Transcribe' },
 		{ href: '/stats', label: 'Stats' },
+		{ href: '/film', label: 'Film' },
+		{ href: '/people', label: 'People' },
+		{ href: '/ingest', label: 'Ingest' },
 	];
 
 	let { children } = $props();
