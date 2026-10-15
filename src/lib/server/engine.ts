@@ -21,7 +21,7 @@ export function filmPath(slug: string): string {
 /** Return a relative media path only for files within the three public engine roots. */
 export function engineMediaPath(target: string): string | null {
 	const rel = relative(engineDir(), resolve(target));
-	if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`) || resolve(rel) === resolve(target)) return null;
+	if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`)) return null;
 	const parts = rel.split(sep);
 	if (parts[0] === 'identities' && parts.length >= 2) return rel;
 	if (parts[0] === 'proxy' && parts.length >= 2) return rel;

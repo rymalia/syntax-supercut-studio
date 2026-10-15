@@ -1,7 +1,9 @@
 import { error, json } from '@sveltejs/kit';
-import { lstat, readFile, writeFile } from 'node:fs/promises';
+import { lstat, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import type { RequestHandler } from './$types';
-import { filmPath } from '$lib/server/engine';
+import { filmPath, filmsDir } from '$lib/server/engine';
 
 function pathFor(slug: string): string {
 	try { return filmPath(slug); } catch { throw error(400, 'Invalid film slug'); }
@@ -24,6 +26,13 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 	}
 	const existing = await lstat(path).catch(() => null);
 	if (existing && !existing.isFile()) throw error(400, 'Invalid film file');
-	await writeFile(path, `${JSON.stringify(film, null, 2)}\n`, { flag: 'w' });
+	// Rename replaces a symlink rather than following it, so a film write stays in films/.
+	const temp = join(filmsDir(), `.${params.slug}.${randomUUID()}.tmp`);
+	try {
+		await writeFile(temp, `${JSON.stringify(film, null, 2)}\n`, { flag: 'wx' });
+		await rename(temp, path);
+	} finally {
+		await unlink(temp).catch(() => {});
+	}
 	return json({ ok: true, slug: params.slug });
 };
