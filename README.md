@@ -7,10 +7,14 @@ supercuts. It can stitch phrase or regex matches, synthesize fake sentences,
 songify clips, transcribe missing media with xAI STT, and browse/delete finished
 renders.
 
+> **Fork:** this repo diverges from the original
+> [wesbos/syntax-supercut-studio](https://github.com/wesbos/syntax-supercut-studio).
+> See [CHANGELOG.md](CHANGELOG.md) for what changed since the fork point.
+
 ## Requirements
 
 - Node 22+
-- `ffmpeg` on `PATH`
+- `ffmpeg` 7+ on `PATH`
 - `aubiopitch` on `PATH` for `/songify` (`brew install aubio`)
 - `XAI_API_KEY` for `/transcribe` and `/supercut` AI regex suggestions
 - One or more local media buckets under `./videos` by default

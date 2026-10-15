@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+This is a fork of wesbos/syntax-supercut-studio that is no longer sent upstream. Record major user-visible changes in `CHANGELOG.md` (baseline tag: `upstream-baseline`).
+
 ## Commands
 
 ```sh
