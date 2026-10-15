@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { CancelledError } from './ffmpeg.js';
+import { filmPath, runEngine, type EngineResult } from './engine.js';
 import { buildSupercut, type SupercutOptions, type SupercutResult } from './pipelines/supercut.js';
 import { buildSentence, type SentenceOptions, type SentenceResult } from './pipelines/sentence.js';
 import { buildSong, type SongifyOptions, type SongifyResult } from './pipelines/songify.js';
@@ -12,7 +13,7 @@ import {
 	type TranscribeAllMissingResult,
 } from './pipelines/transcribe.js';
 
-export type JobKind = 'supercut' | 'sentence' | 'songify' | 'transcribe-one' | 'transcribe-all';
+export type JobKind = 'supercut' | 'sentence' | 'songify' | 'transcribe-one' | 'transcribe-all' | 'film-plan' | 'film-render' | 'ingest';
 
 export type JobStatus = 'running' | 'done' | 'error' | 'cancelled';
 
@@ -33,7 +34,10 @@ export type Job =
 	| JobBase<'sentence', SentenceOptions, SentenceResult>
 	| JobBase<'songify', SongifyOptions, SongifyResult>
 	| JobBase<'transcribe-one', TranscribeOneOptions, TranscribeOneResult>
-	| JobBase<'transcribe-all', TranscribeAllMissingOptions, TranscribeAllMissingResult>;
+	| JobBase<'transcribe-all', TranscribeAllMissingOptions, TranscribeAllMissingResult>
+	| JobBase<'film-plan', { slug: string }, EngineResult>
+	| JobBase<'film-render', { slug: string; draft?: boolean }, EngineResult>
+	| JobBase<'ingest', Record<string, never>, EngineResult>;
 
 export interface SerializableSupercutParams {
 	target?: string;
@@ -174,5 +178,29 @@ export function startTranscribeAll(params: TranscribeAllMissingOptions): Job {
 		TranscribeAllMissingResult
 	>('transcribe-all', params);
 	runInBackground(job, (onLog, signal) => transcribeAllMissing({ ...params, onLog, signal }));
+	return job;
+}
+
+export function startFilmPlan(params: { slug: string }): Job {
+	const job = baseJob<'film-plan', typeof params, EngineResult>('film-plan', params);
+	runInBackground(job, (onLog, signal) => runEngine(['plan', '--film', filmPath(params.slug), '--sheet'], onLog, signal));
+	return job;
+}
+
+export function startFilmRender(params: { slug: string; draft?: boolean }): Job {
+	const job = baseJob<'film-render', typeof params, EngineResult>('film-render', params);
+	runInBackground(job, async (onLog, signal) => {
+		const args = ['render', '--film', filmPath(params.slug)];
+		if (params.draft) args.push('--draft');
+		const render = await runEngine(args, onLog, signal);
+		const qa = await runEngine(['qa', '--name', params.slug], onLog, signal);
+		return { ...render, qa };
+	});
+	return job;
+}
+
+export function startIngest(): Job {
+	const job = baseJob<'ingest', Record<string, never>, EngineResult>('ingest', {});
+	runInBackground(job, (onLog, signal) => runEngine(['ingest'], onLog, signal));
 	return job;
 }

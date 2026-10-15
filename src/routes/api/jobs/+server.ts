@@ -7,6 +7,9 @@ import {
 	startSongify,
 	startTranscribeOne,
 	startTranscribeAll,
+	startFilmPlan,
+	startFilmRender,
+	startIngest,
 } from '$lib/server/jobs';
 
 function asStringArray(value: unknown): string[] | null {
@@ -29,6 +32,17 @@ export const POST: RequestHandler = async ({ request }) => {
 	const buckets = asStringArray((body as Record<string, unknown>).buckets);
 
 	switch (kind) {
+		case 'film-plan':
+		case 'film-render': {
+			const { slug, draft } = body as Record<string, unknown>;
+			if (typeof slug !== 'string' || !/^[a-z0-9_-]+$/.test(slug)) throw error(400, 'Invalid film slug');
+			const job = kind === 'film-plan' ? startFilmPlan({ slug }) : startFilmRender({ slug, draft: draft === true });
+			return json({ id: job.id });
+		}
+		case 'ingest': {
+			const job = startIngest();
+			return json({ id: job.id });
+		}
 		case 'supercut': {
 			const { target, regexSource, tile, limit, debug, dryRun } = body as Record<string, unknown>;
 			if (!target && !regexSource) throw error(400, 'target or regexSource required');

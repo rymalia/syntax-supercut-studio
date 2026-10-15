@@ -3,6 +3,7 @@ import { basename } from 'node:path';
 import type { RequestHandler } from './$types';
 import { cancelJob, getJob } from '$lib/server/jobs';
 import { bucketForPath } from '$lib/server/paths';
+import { engineMediaPath } from '$lib/server/engine';
 
 export const DELETE: RequestHandler = async ({ params }) => {
 	const ok = cancelJob(params.id);
@@ -27,6 +28,9 @@ export const GET: RequestHandler = async ({ params }) => {
 		if (loc) {
 			const filename = basename(abs);
 			mediaUrl = `/api/media/${encodeURIComponent(loc.bucket)}/${loc.kind}/${encodeURIComponent(filename)}`;
+		} else if (job.kind === 'film-render') {
+			const rel = engineMediaPath(abs);
+			if (rel?.startsWith('films/out/')) mediaUrl = `/api/engine-media/${rel.split('/').map(encodeURIComponent).join('/')}`;
 		}
 	}
 
