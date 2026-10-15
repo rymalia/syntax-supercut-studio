@@ -400,7 +400,7 @@ export async function buildSupercut(opts: SupercutOptions): Promise<SupercutResu
 		await runFfmpeg(
 			[
 				...inputArgs,
-				'-filter_complex_script',
+				'-/filter_complex',
 				filterFile,
 				'-map',
 				'[outv]',
@@ -416,7 +416,7 @@ export async function buildSupercut(opts: SupercutOptions): Promise<SupercutResu
 				'yuv420p',
 				'-r',
 				'30',
-				'-vsync',
+				'-fps_mode',
 				'cfr',
 				'-c:a',
 				'aac',
