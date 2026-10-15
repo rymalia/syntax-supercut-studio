@@ -83,31 +83,31 @@
 	<div class="row" style="gap: 3rem;">
 		<div>
 			<div class="caps muted">Buckets</div>
-			<div style="font-size: var(--fs-2); font-weight: 800; line-height: 1;">
+			<div style="font-size: var(--fs-2); font-weight: 800; line-height: 1; margin-block-start: 0.35rem;">
 				{data.groups.length}
 			</div>
 		</div>
 		<div>
 			<div class="caps muted">Videos</div>
-			<div style="font-size: var(--fs-2); font-weight: 800; line-height: 1;">
+			<div style="font-size: var(--fs-2); font-weight: 800; line-height: 1; margin-block-start: 0.35rem;">
 				{data.totals.videos}
 			</div>
 		</div>
 		<div>
 			<div class="caps muted">Transcribed</div>
-			<div style="font-size: var(--fs-2); font-weight: 800; line-height: 1;">
+			<div style="font-size: var(--fs-2); font-weight: 800; line-height: 1; margin-block-start: 0.35rem;">
 				<mark>{data.totals.transcribed}</mark>
 			</div>
 		</div>
 		<div>
 			<div class="caps muted">Total words</div>
-			<div style="font-size: var(--fs-2); font-weight: 800; line-height: 1;">
+			<div style="font-size: var(--fs-2); font-weight: 800; line-height: 1; margin-block-start: 0.35rem;">
 				{data.totals.totalWords.toLocaleString()}
 			</div>
 		</div>
 		<div>
 			<div class="caps muted">Total runtime</div>
-			<div style="font-size: var(--fs-2); font-weight: 800; line-height: 1;">
+			<div style="font-size: var(--fs-2); font-weight: 800; line-height: 1; margin-block-start: 0.35rem;">
 				{totalHours.toFixed(1)}h
 			</div>
 		</div>
