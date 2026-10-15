@@ -155,7 +155,7 @@
 		<video
 			controls
 			src={jobState.mediaUrl}
-			style="inline-size: 100%; aspect-ratio: 16/9; background: var(--ink);"
+			style="inline-size: 100%; aspect-ratio: 16/9; background: var(--well);"
 		></video>
 		<div class="row" style="margin-block-start: 1rem;">
 			<a class="btn btn-ghost btn-small" href={jobState.mediaUrl} download>

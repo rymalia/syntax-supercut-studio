@@ -8,6 +8,14 @@
 	--accent: #d0fe03;
 	--muted: #6b6b6b;
 	--rule: #0a0a0a;
+	/* Text on accent-filled surfaces — always dark, in either theme. */
+	--on-accent: #0a0a0a;
+	/* Inverted "well" behind logs and video — always black. */
+	--well: #0a0a0a;
+	--well-border: transparent;
+	--primary-hover-bg: var(--ink);
+	--primary-hover-fg: var(--accent);
+	--nav-mark: inset 0 -0.6em 0 var(--accent);
 
 	--font-sans: 'Unbounded', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 	--font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -30,6 +38,23 @@
 	--stack: clamp(2rem, 4vw, 4rem);
 
 	color-scheme: light;
+}
+
+/* Dark theme. Set on <html> by the inline script in app.html (stored choice,
+ * else the OS preference) and flipped by the toggle in +layout.svelte. */
+:root[data-theme='dark'] {
+	--bg: #1e1e20;
+	--ink: #f6f6f2;
+	--muted: #b8b8b2;
+	--rule: #f6f6f2;
+	--well: #0e0e0f;
+	--well-border: #3a3a3d;
+	--primary-hover-bg: var(--ink);
+	--primary-hover-fg: var(--bg);
+	/* A half-height bar would sit behind light text; keep it below the caps. */
+	--nav-mark: inset 0 -0.2em 0 var(--accent);
+
+	color-scheme: dark;
 }
 
 *,
@@ -106,19 +131,20 @@ a {
 
 a:hover {
 	background: var(--accent);
-	text-decoration-color: var(--ink);
+	color: var(--on-accent);
+	text-decoration-color: var(--on-accent);
 }
 
 ::selection {
 	background: var(--accent);
-	color: var(--ink);
+	color: var(--on-accent);
 }
 
 /* Accent "spray-painted" highlight used in hero/titles. */
 mark,
 .mark {
 	background: var(--accent);
-	color: var(--ink);
+	color: var(--on-accent);
 	padding-inline: 0.2em;
 	padding-block: 0.05em;
 	border-radius: 0;
@@ -190,6 +216,7 @@ mark,
 
 .wordmark:hover {
 	background: transparent;
+	color: var(--ink);
 }
 
 .wordmark > mark {
@@ -215,11 +242,22 @@ mark,
 
 .nav a:hover {
 	background: transparent;
-	box-shadow: inset 0 -0.6em 0 var(--accent);
+	color: var(--ink);
+	box-shadow: var(--nav-mark);
 }
 
 .nav a[aria-current='page'] {
-	box-shadow: inset 0 -0.6em 0 var(--accent);
+	box-shadow: var(--nav-mark);
+}
+
+.theme-toggle {
+	flex-shrink: 0;
+}
+
+/* Label names the theme the button switches *to*. */
+:root[data-theme='dark'] .theme-toggle__to-dark,
+:root:not([data-theme='dark']) .theme-toggle__to-light {
+	display: none;
 }
 
 /* --------------------------------------------------------------------------
@@ -251,7 +289,7 @@ button,
 button:hover:not(:disabled),
 .btn:hover:not(:disabled) {
 	background: var(--accent);
-	color: var(--ink);
+	color: var(--on-accent);
 }
 
 button:disabled,
@@ -262,12 +300,12 @@ button:disabled,
 
 .btn-primary {
 	background: var(--accent);
-	color: var(--ink);
+	color: var(--on-accent);
 }
 
 .btn-primary:hover:not(:disabled) {
-	background: var(--ink);
-	color: var(--accent);
+	background: var(--primary-hover-bg);
+	color: var(--primary-hover-fg);
 }
 
 .btn-ghost {
@@ -385,8 +423,15 @@ td {
 	vertical-align: middle;
 }
 
+/* The accent row re-scopes tokens to the light palette so its text, pips
+ * and buttons stay readable on the green in either theme. */
 tr:hover td {
+	--bg: #ffffff;
+	--ink: #0a0a0a;
+	--muted: #4a4a4a;
+	--rule: #0a0a0a;
 	background: var(--accent);
+	color: var(--ink);
 }
 
 /* Status cells use small squares instead of coloured pills. */
@@ -403,12 +448,18 @@ tr:hover td {
 	background: var(--accent);
 }
 
+/* On the accent row a lime fill would vanish; fill with ink instead. */
+tr:hover .pip-filled {
+	background: var(--ink);
+}
+
 /* --------------------------------------------------------------------------
  * Monospace log surface (inverted colours — the only such surface)
  * -------------------------------------------------------------------------- */
 
 .logs {
-	background: var(--ink);
+	background: var(--well);
+	border: 1px solid var(--well-border);
 	color: var(--accent);
 	font-family: var(--font-mono);
 	font-size: 0.8125rem;
@@ -421,7 +472,7 @@ tr:hover td {
 }
 
 .logs-empty {
-	color: color-mix(in oklab, var(--accent) 50%, var(--bg) 50%);
+	color: color-mix(in oklab, var(--accent) 70%, var(--well) 30%);
 	font-style: italic;
 }
 
@@ -429,8 +480,10 @@ tr:hover td {
  * Hero marker for home page
  * -------------------------------------------------------------------------- */
 
+/* The <mark> box overhangs the h1's tight line box; the em-based bottom
+ * margin clears it at every clamp()ed font size. */
 .hero h1 {
-	margin-block: 0;
+	margin-block: 0 0.2em;
 }
 
 /* --------------------------------------------------------------------------
@@ -475,7 +528,7 @@ tr:hover td {
 	inline-size: 100%;
 	aspect-ratio: 16 / 9;
 	object-fit: cover;
-	background: var(--ink);
+	background: var(--well);
 	display: block;
 }
 
@@ -489,6 +542,7 @@ tr:hover td {
 
 .clip-tile:hover .clip-tile__name {
 	background: var(--accent);
+	color: var(--on-accent);
 }
 
 .clip-tile__meta {
@@ -527,5 +581,14 @@ tr:hover td {
 
 .tag-accent {
 	background: var(--accent);
-	color: var(--ink);
+	color: var(--on-accent);
+}
+
+.visually-hidden {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
 }
