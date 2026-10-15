@@ -378,7 +378,7 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 		await runFfmpeg(
 			[
 				...inputArgs,
-				'-filter_complex_script',
+				'-/filter_complex',
 				filterFile,
 				'-map',
 				'[outv]',
@@ -394,7 +394,7 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 				'yuv420p',
 				'-r',
 				'30',
-				'-vsync',
+				'-fps_mode',
 				'cfr',
 				'-c:a',
 				'aac',

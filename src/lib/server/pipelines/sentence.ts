@@ -223,7 +223,7 @@ export async function buildSentence(opts: SentenceOptions): Promise<SentenceResu
 		await runFfmpeg(
 			[
 				...inputArgs,
-				'-filter_complex_script',
+				'-/filter_complex',
 				filterFile,
 				'-map',
 				'[outv]',
@@ -239,7 +239,7 @@ export async function buildSentence(opts: SentenceOptions): Promise<SentenceResu
 				'yuv420p',
 				'-r',
 				'30',
-				'-vsync',
+				'-fps_mode',
 				'cfr',
 				'-c:a',
 				'aac',
