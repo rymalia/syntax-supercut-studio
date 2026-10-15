@@ -1,0 +1,81 @@
+{
+ "title": "The Interview",
+ "subtitle": "a comedy in one room",
+ "pause": 0.5,
+ "bed": "~/Downloads/background-music/2019-09-08_-_Sneaky_Rascal_-_David_Fesliyan.mp3",
+ "bed_db": -33,
+ "cast": {
+  "BOSS": [
+   "nicholson"
+  ],
+  "HIM": [
+   "groucho"
+  ]
+ },
+ "lines": [
+  {
+   "speaker": "BOSS",
+   "text": "What do you want?"
+  },
+  {
+   "speaker": "HIM",
+   "text": "Not crazy about it."
+  },
+  {
+   "speaker": "BOSS",
+   "text": "What are you seeking?"
+  },
+  {
+   "speaker": "HIM",
+   "text": "A golf story, if you'd like."
+  },
+  {
+   "speaker": "BOSS",
+   "text": "Do you like the clothes?"
+  },
+  {
+   "speaker": "HIM",
+   "text": "I think that's ridiculous."
+  },
+  {
+   "speaker": "BOSS",
+   "text": "Are you pyromaniacal?"
+  },
+  {
+   "speaker": "HIM",
+   "text": "You've said that before."
+  },
+  {
+   "speaker": "BOSS",
+   "text": "I'm an irritable person."
+  },
+  {
+   "speaker": "HIM",
+   "text": "Be clean and be funny."
+  },
+  {
+   "speaker": "BOSS",
+   "text": "I'm not going one step further."
+  },
+  {
+   "speaker": "HIM",
+   "text": "I'm sure you didn't."
+  },
+  {
+   "speaker": "BOSS",
+   "text": "What do you really want?"
+  },
+  {
+   "speaker": "HIM",
+   "text": "I'd be glad not to talk."
+  },
+  {
+   "speaker": "BOSS",
+   "text": "Excellent question."
+  },
+  {
+   "speaker": "HIM",
+   "text": "It's hard to catch a train that way."
+  }
+ ]
+}

@@ -1,0 +1,77 @@
+{
+ "title": "The Review",
+ "subtitle": "an annual evaluation",
+ "pause": 0.5,
+ "bed": "~/Downloads/background-music/2019-05-03_-_Elevator_Ride_-_www.fesliyanstudios.com.mp3",
+ "bed_db": -34,
+ "cast": {
+  "JORDAN": [
+   "c93/1"
+  ],
+  "CONAN": [
+   "c93/2"
+  ]
+ },
+ "lines": [
+  {
+   "speaker": "JORDAN",
+   "text": "I feel that there's been an alteration."
+  },
+  {
+   "speaker": "CONAN",
+   "text": "What do you mean intentionally done what?"
+  },
+  {
+   "speaker": "JORDAN",
+   "text": "Been a widening."
+  },
+  {
+   "speaker": "CONAN",
+   "text": "I've been doing crunches."
+  },
+  {
+   "speaker": "JORDAN",
+   "text": "It's important to breathe."
+  },
+  {
+   "speaker": "CONAN",
+   "text": "Mind your own business."
+  },
+  {
+   "speaker": "JORDAN",
+   "text": "You don't have the pork chops."
+  },
+  {
+   "speaker": "CONAN",
+   "text": "You think I'm around eating pork chops?"
+  },
+  {
+   "speaker": "JORDAN",
+   "text": "I guarantee you eat pork chops because when you were a child, there was one pork chop too few on the table."
+  },
+  {
+   "speaker": "CONAN",
+   "text": "It looks like a tarantula."
+  },
+  {
+   "speaker": "JORDAN",
+   "text": "And who's to say that it's a negative thing? People may desire this."
+  },
+  {
+   "speaker": "CONAN",
+   "text": "I have my dignity."
+  },
+  {
+   "speaker": "JORDAN",
+   "text": "Do more research."
+  },
+  {
+   "speaker": "CONAN",
+   "text": "I don't disagree, and I will address it."
+  },
+  {
+   "speaker": "JORDAN",
+   "text": "Happy to comply. Let's proceed."
+  }
+ ]
+}

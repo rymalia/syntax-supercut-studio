@@ -203,9 +203,11 @@ def ok(cid, i):
     ws = words(cid)
     return 0 <= i < len(ws) and ws[i]["onscreen"] and (cid, i) not in EX
 
+END_CARD_S = 8.0        # no takes from the last seconds of a source: YouTube end cards / outros
 def admissible(cid, i):
-    """hard filters beyond on-screen: loud enough, face big enough and frontal"""
+    """hard filters beyond on-screen: loud enough, face big enough, not under the end card"""
     w = words(cid)[i]
+    if w["end"] > len(envelope(cid)) / 100 - END_CARD_S: return False
     if word_db(cid, i) < speech_db(cid) + LEVEL_FLOOR_DB: return False
     if w.get("face_h", 1.0) < MIN_FACE_H: return False
     return True

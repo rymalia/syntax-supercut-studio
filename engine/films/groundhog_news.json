@@ -1,0 +1,81 @@
+{
+ "title": "Channel Eight Groundhog Report",
+ "subtitle": "tonight's top story",
+ "pause": 0.45,
+ "bed": "~/Downloads/background-music/2019-05-03_-_Snap_Along_-_David_Fesliyan.mp3",
+ "bed_db": -33,
+ "cast": {
+  "ANCHOR": [
+   "c07/31"
+  ],
+  "FIELD": [
+   "c07/28"
+  ],
+  "DESK": [
+   "c03/10"
+  ]
+ },
+ "lines": [
+  {
+   "speaker": "ANCHOR",
+   "text": "People are picketing the theater."
+  },
+  {
+   "speaker": "FIELD",
+   "text": "This is one time where television really fails."
+  },
+  {
+   "speaker": "FIELD",
+   "text": "Capture the true excitement of a large squirrel predicting the weather."
+  },
+  {
+   "speaker": "ANCHOR",
+   "text": "We found an animal wrangler."
+  },
+  {
+   "speaker": "ANCHOR",
+   "text": "He was a local guy."
+  },
+  {
+   "speaker": "FIELD",
+   "text": "Groundhog was just so upset."
+  },
+  {
+   "speaker": "ANCHOR",
+   "text": "Gets a little squirrely."
+  },
+  {
+   "speaker": "FIELD",
+   "text": "Don't drive angry. Don't drive angry."
+  },
+  {
+   "speaker": "ANCHOR",
+   "text": "Really big bite out of Bill's hand."
+  },
+  {
+   "speaker": "FIELD",
+   "text": "Call me Punksatony.",
+   "caption": "Call me Punxsutawney."
+  },
+  {
+   "speaker": "ANCHOR",
+   "text": "Are you living the same day over and over again?"
+  },
+  {
+   "speaker": "FIELD",
+   "text": "Every day was exactly the same."
+  },
+  {
+   "speaker": "ANCHOR",
+   "text": "This is really gonna piss her off."
+  },
+  {
+   "speaker": "FIELD",
+   "text": "What do you bet?"
+  },
+  {
+   "speaker": "DESK",
+   "text": "We're out of time. Thank you, and good night."
+  }
+ ]
+}

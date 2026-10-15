@@ -1,0 +1,65 @@
+{
+ "title": "Press Conference",
+ "subtitle": "the coach takes questions",
+ "pause": 0.55,
+ "bed": "~/Downloads/background-music/bensound-jazzcomedy.mp3",
+ "cast": {
+  "*": [
+   "ditka"
+  ]
+ },
+ "lines": [
+  {
+   "text": "I don't want to answer any questions."
+  },
+  {
+   "text": "There's three quarterbacks."
+  },
+  {
+   "text": "Whichever one starts, starts."
+  },
+  {
+   "text": "Period. Cut and dry."
+  },
+  {
+   "text": "What do you want?"
+  },
+  {
+   "text": "Some magic tricks I'll show you."
+  },
+  {
+   "text": "See that? That's your IQ, buddy. Zero."
+  },
+  {
+   "text": "No, no, no, no, no."
+  },
+  {
+   "text": "I've never been upset."
+  },
+  {
+   "text": "There is not one problem."
+  },
+  {
+   "text": "We ran the ball. We ran the ball."
+  },
+  {
+   "text": "We're proud of our people."
+  },
+  {
+   "text": "Those who don't like our people, that's tough."
+  },
+  {
+   "text": "That's my opinion. That's my opinion."
+  },
+  {
+   "text": "Want to thank my opposition."
+  },
+  {
+   "text": "Don't you ever forget that."
+  },
+  {
+   "text": "Again, thank you."
+  }
+ ],
+ "bed_db": -32
+}

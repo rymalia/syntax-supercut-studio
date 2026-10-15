@@ -1,0 +1,52 @@
+{
+ "title": "Your Mother and I",
+ "subtitle": "",
+ "pause": 0.8,
+ "bed": "roomtone",
+ "cast": {
+  "*": [
+   "c33/0"
+  ]
+ },
+ "lines": [
+  {
+   "text": "I'll tell you the truth."
+  },
+  {
+   "text": "Did something that day that I'd never done."
+  },
+  {
+   "text": "The door was open. I go in."
+  },
+  {
+   "text": "I didn't want to hurt her feelings."
+  },
+  {
+   "text": "I don't know how much time passed."
+  },
+  {
+   "text": "I tell you, my knees are shaking."
+  },
+  {
+   "text": "That first day in the hospital, your mother and I stood side by side."
+  },
+  {
+   "text": "Most of the news was bad, but still, we stood."
+  },
+  {
+   "text": "Get through this thing alone."
+  },
+  {
+   "text": "Have to respect her wishes."
+  },
+  {
+   "text": "Whether I want to do or not."
+  },
+  {
+   "text": "The truth will come out."
+  },
+  {
+   "text": "And she'll understand."
+  }
+ ]
+}

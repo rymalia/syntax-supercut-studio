@@ -1,0 +1,122 @@
+{
+ "title": "Some Advice",
+ "subtitle": "from people who have no idea who you are",
+ "pause": 0.5,
+ "bed": "~/Downloads/background-music/2020-10-19_-_Its_A_Good_Day_-_www.FesliyanStudios.com_Steve_Oxen.mp3",
+ "bed_db": -33,
+ "speaker_labels": false,
+ "lines": [
+  {
+   "speaker": "0",
+   "cast": [
+    "c72/0"
+   ],
+   "only": true,
+   "text": "It's always the fear of a thing."
+  },
+  {
+   "speaker": "1",
+   "cast": [
+    "c72/0"
+   ],
+   "only": true,
+   "text": "It was never as difficult as you were afraid it would be."
+  },
+  {
+   "speaker": "2",
+   "cast": [
+    "c108/0"
+   ],
+   "only": true,
+   "text": "Be careful what movies you sneak into, kids."
+  },
+  {
+   "speaker": "3",
+   "cast": [
+    "c29/0"
+   ],
+   "only": true,
+   "text": "Be clean and be funny."
+  },
+  {
+   "speaker": "4",
+   "cast": [
+    "c45/0"
+   ],
+   "only": true,
+   "text": "Eat a lot, a lot of cruciferous vegetables."
+  },
+  {
+   "speaker": "5",
+   "cast": [
+    "c36/3"
+   ],
+   "only": true,
+   "text": "You could just drink out of the tap."
+  },
+  {
+   "speaker": "6",
+   "cast": [
+    "c37/1"
+   ],
+   "only": true,
+   "text": "Let's go for a drink. Let's do it. Let's hang out."
+  },
+  {
+   "speaker": "7",
+   "cast": [
+    "c44/0"
+   ],
+   "only": true,
+   "text": "Come on, don't be such an old lady. Everything's cool."
+  },
+  {
+   "speaker": "8",
+   "cast": [
+    "c58/5"
+   ],
+   "only": true,
+   "text": "Staring out a window, thinking the life you should be living is out there somewhere, but not being willing to open the door and go get it."
+  },
+  {
+   "speaker": "9",
+   "cast": [
+    "c72/0"
+   ],
+   "only": true,
+   "text": "There's always a way. Okay, it may not be the best way."
+  },
+  {
+   "speaker": "10",
+   "cast": [
+    "c72/0"
+   ],
+   "only": true,
+   "text": "You have to expect failure, and you have to expect to learn from that failure."
+  },
+  {
+   "speaker": "11",
+   "cast": [
+    "c39/3"
+   ],
+   "only": true,
+   "text": "Life is to be experienced."
+  },
+  {
+   "speaker": "12",
+   "cast": [
+    "c133/8"
+   ],
+   "only": true,
+   "text": "Sounds like something you should be telling your psychiatrist."
+  },
+  {
+   "speaker": "13",
+   "cast": [
+    "c08/0"
+   ],
+   "only": true,
+   "text": "Don't you ever forget that."
+  }
+ ]
+}

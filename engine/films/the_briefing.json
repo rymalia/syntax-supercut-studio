@@ -1,0 +1,82 @@
+{
+ "title": "The Briefing",
+ "subtitle": "two men, one bottle",
+ "pause": 0.5,
+ "bed": "~/Downloads/background-music/FunnyMusic-2018-09-22_-_Seriously_-_David_Fesliyan.mp3",
+ "bed_db": -33,
+ "cast": {
+  "GUST": [
+   "hoffman"
+  ],
+  "CHARLIE": [
+   "hanks"
+  ]
+ },
+ "lines": [
+  {
+   "speaker": "GUST",
+   "text": "I'm the guy you want to talk to, Congressman."
+  },
+  {
+   "speaker": "CHARLIE",
+   "text": "Who are you again?"
+  },
+  {
+   "speaker": "GUST",
+   "text": "Wanted to give you this."
+  },
+  {
+   "speaker": "CHARLIE",
+   "text": "Don't remember your name."
+  },
+  {
+   "speaker": "GUST",
+   "text": "Holt's a massive tool, Congressman."
+  },
+  {
+   "speaker": "CHARLIE",
+   "text": "Trying to defeat the Soviets?"
+  },
+  {
+   "speaker": "GUST",
+   "text": "Trying to defeat the Soviets, Congressman."
+  },
+  {
+   "speaker": "GUST",
+   "text": "Be a little grumpy myself."
+  },
+  {
+   "speaker": "CHARLIE",
+   "text": "That's a thick door."
+  },
+  {
+   "speaker": "GUST",
+   "text": "Was gonna tell you about it, but I'd leave the room for a second because you were getting indicted."
+  },
+  {
+   "speaker": "CHARLIE",
+   "text": "Everything's gonna start going our way."
+  },
+  {
+   "speaker": "GUST",
+   "text": "I don't mean to cast aspersions on a guy."
+  },
+  {
+   "speaker": "CHARLIE",
+   "text": "You ain't James Bond."
+  },
+  {
+   "speaker": "GUST",
+   "text": "You ain't Thomas Jefferson's.",
+   "caption": "You ain't Thomas Jefferson."
+  },
+  {
+   "speaker": "CHARLIE",
+   "text": "Shoot down the goddamn helicopters."
+  },
+  {
+   "speaker": "GUST",
+   "text": "God, yeah."
+  }
+ ]
+}
