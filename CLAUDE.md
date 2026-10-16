@@ -23,7 +23,7 @@ npm run build && node build   # production build via adapter-node
 
 There is no test suite. Verify changes with `npm run check` and by running a job through the UI (or `POST /api/jobs`) against real media.
 
-External runtime deps: `ffmpeg` 7+ on `PATH` (all rendering; pipelines use the `-/filter_complex <file>` and `-fps_mode` forms, which ffmpeg 9 requires), `aubiopitch` on `PATH` (`/songify`), `XAI_API_KEY` (`/transcribe` STT and `/api/regex-suggest`). Requires Node 22+.
+External runtime deps: `ffmpeg` 7+ on `PATH` (all rendering; pipelines use the `-/filter_complex <file>` and `-fps_mode` forms, which ffmpeg 9 requires), `aubiopitch` on `PATH` (`/songify`), `parakeet-mlx` (`/transcribe`, local by default), `XAI_API_KEY` (`/transcribe` fallback and `/api/regex-suggest`). Requires Node 22+.
 
 ## Environment
 
@@ -45,13 +45,13 @@ SvelteKit (Svelte 5 runes) single-user local app. All heavy work is server-side 
 **Job flow** (the core pattern spanning several files):
 1. A page `POST`s `{ kind, ...params, buckets }` to `src/routes/api/jobs/+server.ts`, which validates and calls a `start*` function in `src/lib/server/jobs.ts`.
 2. `jobs.ts` stores the job in an in-memory `Map` (lost on restart; outputs persist on disk), creates an `AbortController`, and runs the pipeline in the background with `(onLog, signal)`.
-3. Pipelines in `src/lib/server/pipelines/` (`supercut`, `sentence`, `songify`, `transcribe`) stream progress through `onLog` and must honor `signal` — use `runFfmpeg(args, onLog, signal)` and `throwIfAborted(signal)` from `ffmpeg.ts`. A thrown `CancelledError` marks the job `cancelled` rather than `error`.
+3. Pipelines in `src/lib/server/pipelines/` (`supercut`, `sentence`, `songify`, `transcribe`) stream progress through `onLog` and must honor `signal` — use `runFfmpeg(args, onLog, signal)` and `throwIfAborted(signal)` from `ffmpeg.ts`. A thrown `CancelledError` marks the job `cancelled` rather than `error`. `sentence` runs on the engine via `runEngine`; other long-lived child processes (parakeet in `transcribe`) go through `engine.ts` `runDetachedProcess`, which owns process-group kill on cancel and shutdown.
 4. `src/lib/JobPanel.svelte` polls `GET /api/jobs/[id]` (~1s) and cancels via `DELETE`. The GET derives a `mediaUrl` from `result.outFile` when that path lies inside a bucket — so pipelines that produce a video should return an absolute `outFile`.
 
 Long-running work (render, ingest) goes through this job flow; quick queries may call a pipeline or the engine synchronously from their own route (e.g. `api/engine/check`, `api/engine/grep`). Adding a new job kind means touching: the pipeline module, the `JobKind`/`Job` union and a `start*` in `jobs.ts`, a `case` in `api/jobs/+server.ts`, and a route page.
 
 **Shared render helpers**:
-- `hits.ts` `collectHits` — scans transcripts for a phrase (token-wise match after `text.ts` `normalize`) or a regex (matched against words joined by single spaces, then mapped back to word timings). Used by supercut, sentence, songify.
+- `hits.ts` `collectHits` — scans transcripts for a phrase (token-wise match after `text.ts` `normalize`) or a regex (matched against words joined by single spaces, then mapped back to word timings). Used by supercut and songify.
 - `drawtext.ts` — ffmpeg `drawtext` filter for debug overlays; its quoting follows ffmpeg's `av_get_token` rules (see comments; a past bug fix was here).
 - `ffmpeg.ts` `atempoChain` — chains `atempo` stages since each is limited to 0.5–2.0.
 
@@ -64,7 +64,7 @@ Long-running work (render, ingest) goes through this job flow; quick queries may
 A separate Python engine (face/active-speaker analysis, person-bound "film" rendering) lives **outside this repo** at `TH_ENGINE_DIR`. The app talks to it only through `engine_cli.py`; `docs/ENGINE_CONTRACT.md` is the authoritative protocol (commands, RESULT shapes, film JSON, casting rules).
 
 - `src/lib/server/engine.ts` `runEngine(args, onLog, signal)` spawns `<TH_ENGINE_DIR>/asd/.venv/bin/python engine_cli.py ...`. stdout lines are `LOG <text>` (→ `onLog`) and exactly one final `RESULT <json>`; success requires exit 0 and `ok: true`. stderr is noise except its last ~40 lines on failure. Abort sends SIGTERM and rejects with `CancelledError`.
-- Job kinds `film-plan`, `film-render` (render then `qa`), `ingest` use the standard job flow. `/api/jobs/[id]` maps a `film-render` `outFile` under `films/out/` to an `/api/engine-media/...` URL.
+- Job kinds `film-plan`, `film-render` (render then `qa`), `ingest` use the standard job flow. `/api/jobs/[id]` maps a `film-render` or `sentence` `outFile` under `films/out/` to an `/api/engine-media/...` URL.
 - Film scripts are `<TH_ENGINE_DIR>/films/<slug>.json`; `filmPath()` enforces slug `^[a-z0-9_-]+$`. `PUT /api/films/[slug]` writes via temp file + `rename` so a symlinked target can't redirect the write outside `films/`.
 - `/api/engine-media/[...path]` is a second read-only media root limited by `engineMediaPath()` to `identities/`, `proxy/`, `films/out/` (checked before and after `realpath`), with `Range` support.
 - UI: `/film` (script editor, casting, check/plan/render), `/people`, `/ingest`.
