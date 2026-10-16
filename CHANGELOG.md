@@ -20,6 +20,7 @@ Changes are not sent upstream. Newest first; group entries by date.
   identify, with an unnamed count. People search on `/people` and `/film` also
   matches a cluster's name, with `_` matching a space (`billy_boy` is found by
   "billy", "boy" or "billy boy").
+  The group buttons above the grid collapse under a "Groups" toggle, also remembered.
 - **Ingest tooling in the engine snapshot.** `engine/ingest_all.sh` runs the whole
   incremental ingest (ASR, faces, ASD, identities, phrase bank) and refreshes the
   app buckets with the new `engine/build_buckets.py`; new sources in

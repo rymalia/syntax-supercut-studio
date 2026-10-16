@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
 	export type Person = { id: string; clip: string; clip_name: string; seconds: number; words: number; thumb: string; thumb_index: number };
@@ -21,6 +22,14 @@
 		return `${person.id} ${person.clip_name} ${person.clip} ${name} ${name.replaceAll('_', ' ')}`.toLowerCase().includes(search.toLowerCase());
 	}));
 	let groups = $derived(Object.entries(names).filter(([name]) => `${name} ${name.replaceAll('_', ' ')}`.toLowerCase().includes(search.toLowerCase())));
+	let groupsOpen = $state(true);
+	onMount(() => {
+		try { groupsOpen = localStorage.getItem('people.groupsOpen') !== '0'; } catch { /* storage blocked */ }
+	});
+	function rememberGroupsOpen(open: boolean) {
+		groupsOpen = open;
+		try { localStorage.setItem('people.groupsOpen', open ? '1' : '0'); } catch { /* storage blocked */ }
+	}
 	function choose(id: string) {
 		if (readOnly) goto(`/film?person=${encodeURIComponent(id)}`);
 		else onSelect?.(id);
@@ -34,7 +43,9 @@
 	<label for="people-search">Search people and groups</label>
 	<input id="people-search" type="search" bind:value={search} placeholder="Person, clip, or group" />
 	{#if groups.length}
-		<div class="row">
+		<details open={groupsOpen} ontoggle={(event) => rememberGroupsOpen(event.currentTarget.open)}>
+		<summary class="caps">Groups · {groups.length === Object.keys(names).length ? groups.length : `${groups.length} of ${Object.keys(names).length}`}</summary>
+		<div class="row groups">
 			{#each groups as [name, ids]}
 				{#if readOnly && onGroup}
 					<button type="button" class="btn-ghost btn-small" onclick={() => onGroup(name)} title={`Select ${name}`}>{name} · {ids.length}</button>
@@ -45,6 +56,7 @@
 				{/if}
 			{/each}
 		</div>
+		</details>
 	{/if}
 	<div class="person-grid">
 		{#each matches as person (person.id)}
@@ -65,6 +77,8 @@
 </div>
 
 <style>
+	summary { cursor: pointer; }
+	.groups { margin-block-start: 0.75rem; }
 	.person-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; max-height: 32rem; overflow: auto; }
 	.person-tile { display: grid; gap: 0.35rem; padding: 0; background: transparent; color: var(--ink); text-transform: none; letter-spacing: normal; text-align: left; min-width: 0; }
 	.person-tile:hover { background: transparent; color: var(--ink); }
