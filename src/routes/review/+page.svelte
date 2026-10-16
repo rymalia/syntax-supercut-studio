@@ -129,7 +129,7 @@
 {:else}
 	<section class="row" aria-label="Review batch">
 		{#each batches as b (b.batch)}
-			<button type="button" class={b.batch === batch ? 'btn-small' : 'btn-ghost btn-small'} aria-pressed={b.batch === batch} onclick={() => choose(b.batch)}>
+			<button type="button" class={b.batch === batch ? 'btn-small' : 'btn-ghost btn-small'} aria-pressed={b.batch === batch} disabled={saving} onclick={() => choose(b.batch)}>
 				{b.batch} · {b.decided}/{b.items}
 			</button>
 		{/each}
