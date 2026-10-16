@@ -11,7 +11,7 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 | B3 | `engine_cli.py ingest --dry-run` (lists new sources, no work) | desktop | todo | | |
 | B4 | "Check for new sources" button + count on `/ingest` | code | todo | B3 | |
 | B5 | `thumbs` job kind; `ingest_all.sh` already POSTs it | code | done | | `POST /api/jobs {kind:"thumbs", buckets?}`; first run warmed all 358 strips in 60 s, re-run 0.01 s; light theme checked |
-| B6 | `activity.jsonl` written by `jobs.ts` and `engine_cli.py`; last-20 panel on Library | code | todo | | line format: `{ts, actor, action, target, result}` |
+| B6 | `activity.jsonl` written by `jobs.ts` and `engine_cli.py`; last-20 panel on Library | code+desktop | app half done | | line format: `{ts, actor, action, target, result}` (see contract, Activity log); Library shows 5 with a toggle; engine half (`engine_cli.py` appends `actor: "desktop"`) open |
 | B7 | `notes` fields on films and people, editable in UI | code | todo | | |
 | B8 | Per-word attributes (`onscreen`, `person`, `event`) in transcripts + `hits.ts` filters; retire onscreen bucket | code | todo | B9 | |
 | B9 | `build_buckets.py` emits per-word fields | desktop | todo | | 0.1 day |
@@ -26,4 +26,5 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 | B18 | Local parakeet-mlx as default transcription in app, xAI fallback | code | todo | | proposed by code |
 | B19 | Remote Control test for live agent messaging | ryan | todo | | 5 min |
 | B20 | `-hwaccel videotoolbox` decode for thumbnail strips, then raise strip concurrency | code | todo | | most sources are AV1; M4 Max decodes AV1 in hardware |
-| B21 | Cancelling an ingest/render kills the whole engine process tree (app: own process group + group kill; engine: forward SIGTERM in `stream()`) | code+desktop | todo | | found by Codex review 2026-10-15; today `ingest_new.sh`, ffmpeg and ASD workers keep running after cancel |
+| B21 | Cancelling an ingest/render kills the whole engine process tree (app: own process group + group kill; engine: forward SIGTERM in `stream()`) | code+desktop | app half done | | app: detached spawn, group SIGTERM, SIGKILL at 10 s, shutdown hook (`1c213b6`); engine half (forward SIGTERM in `stream()`) open; found by Codex review 2026-10-15; today `ingest_new.sh`, ffmpeg and ASD workers keep running after cancel |
+| B22 | `/people` toggle to hide clusters that already have a name, to narrow down the ones left to identify | code | todo | | requested by ryan 2026-10-16 |

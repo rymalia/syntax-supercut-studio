@@ -21,6 +21,11 @@ Changes are not sent upstream. Newest first; group entries by date.
   `talking-heads-videos` appear in the Library without a server restart.
   Corpus: 179 clips, 192k words.
 
+### Fixed
+- **Cancelling an engine job stops all of its work.** Cancel, and stopping the dev
+  server, now signal the engine's whole process group (SIGTERM, then SIGKILL after
+  10 s), so `ingest_new.sh`, ffmpeg and ASD workers no longer keep running.
+
 ## 2026-10-15
 
 ### Added
