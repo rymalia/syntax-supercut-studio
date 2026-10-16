@@ -28,7 +28,7 @@ External runtime deps: `ffmpeg` 7+ on `PATH` (all rendering; pipelines use the `
 
 SvelteKit (Svelte 5 runes) single-user local app. All heavy work is server-side under `src/lib/server/`.
 
-**Buckets** (`src/lib/server/paths.ts`): each direct child of `BUCKETS_ROOT` with a `videos/` subdir is a bucket containing `videos/` (source media), `transcripts/` (`<slug>.json` word-level STT), `supercuts/` (renders). A transcript pairs with a video by matching basename (`<slug>.json` ↔ `<slug>.<video-ext>`); transcripts without a matching video are skipped. `resolveBuckets(names)` returns all buckets for empty/null input and throws on unknown names. `bucketForPath` is the path-traversal guard used for media serving — only `videos/` and `supercuts/` are servable.
+**Buckets** (`src/lib/server/paths.ts`): each direct child of `BUCKETS_ROOT` with a `videos/` subdir is a bucket containing `videos/` (source media), `transcripts/` (`<slug>.json` word-level STT), `supercuts/` (renders), plus a `thumbs/` cache of Library hover strips (`src/lib/server/thumbs.ts`, served by `/api/thumb/[bucket]/[slug]`; regenerated when older than the video). A transcript pairs with a video by matching basename (`<slug>.json` ↔ `<slug>.<video-ext>`); transcripts without a matching video are skipped. `resolveBuckets(names)` returns all buckets for empty/null input and throws on unknown names. `bucketForPath` is the path-traversal guard used for media serving — only `videos/` and `supercuts/` are servable.
 
 **Job flow** (the core pattern spanning several files):
 1. A page `POST`s `{ kind, ...params, buckets }` to `src/routes/api/jobs/+server.ts`, which validates and calls a `start*` function in `src/lib/server/jobs.ts`.

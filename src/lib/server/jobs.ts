@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { CancelledError } from './ffmpeg.js';
+import { CancelledError, throwIfAborted } from './ffmpeg.js';
+import { listBuckets } from './paths.js';
+import { generateMissingThumbs } from './thumbs.js';
 import { filmPath, runEngine, type EngineResult } from './engine.js';
 import { buildSupercut, type SupercutOptions, type SupercutResult } from './pipelines/supercut.js';
 import { buildSentence, type SentenceOptions, type SentenceResult } from './pipelines/sentence.js';
@@ -201,6 +203,12 @@ export function startFilmRender(params: { slug: string; draft?: boolean }): Job 
 
 export function startIngest(): Job {
 	const job = baseJob<'ingest', Record<string, never>, EngineResult>('ingest', {});
-	runInBackground(job, (onLog, signal) => runEngine(['ingest'], onLog, signal));
+	runInBackground(job, async (onLog, signal) => {
+		const ingest = await runEngine(['ingest'], onLog, signal);
+		onLog('Generating library thumbnails for new videos...');
+		const thumbs = await generateMissingThumbs(await listBuckets(), onLog, signal);
+		throwIfAborted(signal);
+		return { ...ingest, thumbs };
+	});
 	return job;
 }

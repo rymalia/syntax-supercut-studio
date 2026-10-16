@@ -19,7 +19,7 @@
 				rows: g.rows.filter((r) => {
 					if (showOnlyMissing && r.hasTranscript) return false;
 					if (!q) return true;
-					return r.slug.toLowerCase().includes(q);
+					return r.slug.toLowerCase().includes(q) || (r.title?.toLowerCase().includes(q) ?? false);
 				}),
 			}));
 	});
@@ -68,6 +68,54 @@
 	}
 
 	const totalHours = $derived(data.totals.totalDurationSec / 3600);
+
+	// Hover preview: a 4-frame strip from /api/thumb, shown after a short delay
+	// so sweeping the pointer down the table doesn't request every row.
+	const PREVIEW_DELAY_MS = 150;
+	const POINTER_GAP = 18;
+	let preview = $state<{ bucket: string; slug: string; label: string } | null>(null);
+	let previewStatus = $state<'loading' | 'ready' | 'error'>('loading');
+	let pointer = $state({ x: 0, y: 0 });
+	let popW = $state(0);
+	let popH = $state(0);
+	let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function showPreview(e: MouseEvent, row: PageData['groups'][number]['rows'][number]) {
+		if (hoverTimer) clearTimeout(hoverTimer);
+		pointer = { x: e.clientX, y: e.clientY };
+		if (!row.hasVideo) {
+			preview = null;
+			return;
+		}
+		hoverTimer = setTimeout(() => {
+			if (preview?.bucket !== row.bucket || preview?.slug !== row.slug) previewStatus = 'loading';
+			preview = { bucket: row.bucket, slug: row.slug, label: row.title ?? row.slug };
+		}, PREVIEW_DELAY_MS);
+	}
+
+	// Ignore a late load/error from a previous row's image.
+	function setPreviewStatus(e: Event, status: 'ready' | 'error') {
+		const key = preview && `/api/thumb/${encodeURIComponent(preview.bucket)}/${encodeURIComponent(preview.slug)}`;
+		if (key && (e.currentTarget as HTMLImageElement).src.endsWith(key)) previewStatus = status;
+	}
+
+	function hidePreview() {
+		if (hoverTimer) clearTimeout(hoverTimer);
+		hoverTimer = null;
+		preview = null;
+	}
+
+	// Keep the popover inside the viewport: right of the pointer, flipping
+	// left/above near the edges.
+	const popStyle = $derived.by(() => {
+		const vw = typeof window === 'undefined' ? 0 : window.innerWidth;
+		const vh = typeof window === 'undefined' ? 0 : window.innerHeight;
+		let left = pointer.x + POINTER_GAP;
+		if (left + popW > vw - 16) left = Math.max(16, pointer.x - POINTER_GAP - popW);
+		let top = pointer.y + POINTER_GAP;
+		if (top + popH > vh - 16) top = Math.max(16, pointer.y - POINTER_GAP - popH);
+		return `left: ${left}px; top: ${top}px;`;
+	});
 </script>
 
 <section class="hero">
@@ -132,7 +180,7 @@
 		<div class="row" style="gap: 1rem;">
 			<input
 				type="search"
-				placeholder="FILTER BY SLUG..."
+				placeholder="FILTER BY SLUG OR TITLE..."
 				bind:value={filter}
 				style="max-width: 28rem;"
 			/>
@@ -166,9 +214,16 @@
 			</thead>
 			<tbody>
 				{#each group.rows as row (row.bucket + '::' + row.slug)}
-					<tr>
+					<tr
+						onmouseenter={(e) => showPreview(e, row)}
+						onmousemove={(e) => (pointer = { x: e.clientX, y: e.clientY })}
+						onmouseleave={hidePreview}
+					>
 						<td style="max-width: 38rem;">
 							<span style="font-weight: 600;">{row.slug}</span>
+							{#if row.title}
+								<span class="row-title muted">{row.title}</span>
+							{/if}
 						</td>
 						<td>
 							<span class="pip" class:pip-filled={row.hasVideo}></span>
@@ -217,3 +272,31 @@
 		</table>
 	</section>
 {/each}
+
+{#if preview}
+	<div
+		class="thumb-pop"
+		style={popStyle}
+		bind:offsetWidth={popW}
+		bind:offsetHeight={popH}
+		aria-hidden="true"
+	>
+		<div class="thumb-pop__label">{preview.label}</div>
+		<div class="thumb-pop__frame">
+			{#key `${preview.bucket}/${preview.slug}`}
+				<img
+					src={`/api/thumb/${encodeURIComponent(preview.bucket)}/${encodeURIComponent(preview.slug)}`}
+					alt=""
+					class:is-ready={previewStatus === 'ready'}
+					onload={(e) => setPreviewStatus(e, 'ready')}
+					onerror={(e) => setPreviewStatus(e, 'error')}
+				/>
+			{/key}
+			{#if previewStatus !== 'ready'}
+				<span class="thumb-pop__status">
+					{previewStatus === 'error' ? 'No preview' : 'Loading…'}
+				</span>
+			{/if}
+		</div>
+	</div>
+{/if}

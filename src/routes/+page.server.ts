@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, readlink, stat } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import type { PageServerLoad } from './$types';
 import { listBuckets, VIDEO_EXTS, AUDIO_EXTS } from '$lib/server/paths';
@@ -6,6 +6,8 @@ import { listBuckets, VIDEO_EXTS, AUDIO_EXTS } from '$lib/server/paths';
 export interface VideoRow {
 	bucket: string;
 	slug: string;
+	/** Original filename (without extension) when the video is a symlink to a differently named source. */
+	title: string | null;
 	videoFile: string | null;
 	mp3File: string | null;
 	transcriptFile: string | null;
@@ -35,7 +37,7 @@ export const load: PageServerLoad = async () => {
 	};
 
 	for (const bucket of buckets) {
-		const videos = new Map<string, { file: string; size: number }>();
+		const videos = new Map<string, { file: string; size: number; title: string | null }>();
 		const mp3s = new Map<string, { file: string; size: number }>();
 
 		let videoEntries: string[] = [];
@@ -50,7 +52,11 @@ export const load: PageServerLoad = async () => {
 			const info = await stat(full).catch(() => null);
 			if (!info) continue;
 			if (VIDEO_EXTS.has(ext)) {
-				videos.set(slug, { file, size: info.size });
+				// Ingested buckets symlink `<slug>.mp4` to the original download,
+				// whose name is the only human-readable title we have.
+				const target = await readlink(full).catch(() => null);
+				const original = target ? basename(target, extname(target)) : null;
+				videos.set(slug, { file, size: info.size, title: original && original !== slug ? original : null });
 			} else if (AUDIO_EXTS.has(ext) && ext === '.mp3') {
 				mp3s.set(slug, { file, size: info.size });
 			}
@@ -87,6 +93,7 @@ export const load: PageServerLoad = async () => {
 			rows.push({
 				bucket: bucket.name,
 				slug,
+				title: v?.title ?? null,
 				videoFile: v?.file ?? null,
 				mp3File: m?.file ?? null,
 				transcriptFile: tFile ?? null,
