@@ -17,7 +17,10 @@ THR = 1.0          # mean Light-ASD/LR-ASD logit; > 0 is the models' own cut, 1.
                    # (keeps 85% of segments he marked speaking, drops 62% of those he marked voice-over)
 STRICT = {"c02": 2.0, "c03": 2.0, "c15": 2.0, "c20": 2.0, "c25": 2.0}   # half or more of the reviewed segments were voice-over
 REVIEW = os.path.join(HERE, "review", "decisions.json")
-DEC = json.load(open(REVIEW))["decisions"] if os.path.exists(REVIEW) else []
+import glob as _g
+DEC = []   # the first review plus one decisions.json per ingest batch (review/<batch>/decisions.json); later files win
+for _f in ([REVIEW] if os.path.exists(REVIEW) else []) + sorted(_g.glob(os.path.join(HERE, "review", "*", "decisions.json"))):
+    DEC += json.load(open(_f))["decisions"]
 FILL_THR = -1.0    # a word between two on-screen words of the same face is kept if it scores above this
 SEG_GAP = 0.8
 

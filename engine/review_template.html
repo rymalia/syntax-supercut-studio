@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Speaker Review</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1c1c1a;--mute:#6d6a63;--line:#e3e0d9;--ok:#2f7d4f;--vo:#b5442f;--mix:#b07d1a;--sel:#1c1c1a}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1e1e1c;--ink:#ecebe6;--mute:#9a978f;--line:#33322f;--sel:#ecebe6}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+h1{font-size:17px;margin:0;font-weight:650}#prog{color:var(--mute)}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:5px 10px;cursor:pointer}
+button.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+main{padding:12px 20px 80px;max-width:1500px;margin:auto}
+.help{color:var(--mute);max-width:820px;margin:6px 0 18px}
+section{margin:26px 0}section h2{font-size:15px;margin:0 0 2px}section .meta{color:var(--mute);font-size:12px;margin-bottom:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.card.v-voiceover{outline:3px solid var(--vo)}.card.v-mixed{outline:3px solid var(--mix)}.card.v-speaking.touched{outline:2px solid var(--ok)}
+video{width:100%;aspect-ratio:16/9;background:#000;display:block}
+.body{padding:8px 10px;display:flex;flex-direction:column;gap:6px;flex:1}
+.txt{font-size:13px}.sm{color:var(--mute);font-size:11.5px;font-variant-numeric:tabular-nums}
+.btns{display:flex;gap:6px;margin-top:auto}.btns button{flex:1;font-size:12px;padding:4px 6px}
+.btns button.on[data-v=speaking]{background:var(--ok);color:#fff;border-color:var(--ok)}
+.btns button.on[data-v=voiceover]{background:var(--vo);color:#fff;border-color:var(--vo)}
+.btns button.on[data-v=mixed]{background:var(--mix);color:#fff;border-color:var(--mix)}
+</style></head><body>
+<header><h1>Speaker review: on camera or voice-over?</h1><span id="prog"></span><span style="flex:1"></span>
+<button id="save" class="primary">Save decisions</button></header>
+<main>
+<p class="help">Each clip plays one segment the detector counted as <b>spoken by the face on screen</b>. The yellow box is the face it thinks is talking. Everything starts as <b>Speaking</b>, so you only need to mark the exceptions: <b>Voice-over</b> means the voice isn't that face (narration, an interviewer, someone off screen), and <b>Mixed</b> means only part of it is. Click <b>Save decisions</b> when you're done. It downloads <code>decisions.json</code> and your choices are also kept in this page.</p>
+<div id="list"></div></main>
+<script>
+const DATA = /*DATA*/[];
+const KEY = "speaker-review-v1";
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+const id = it => it.clip + ":" + it.seg;
+function persist(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} prog(); }
+function prog(){ const n = DATA.reduce((a,c)=>a+c.items.length,0); const t = Object.keys(state).length;
+  const vo = Object.values(state).filter(v=>v!=="speaking").length;
+  document.getElementById("prog").textContent = `${t} of ${n} checked · ${vo} marked voice-over/mixed`; }
+function setV(it, v, card){ state[id(it)] = v; card.className = "card v-"+v+" touched";
+  card.querySelectorAll(".btns button").forEach(b=>b.classList.toggle("on", b.dataset.v===v)); persist(); }
+const list = document.getElementById("list");
+DATA.forEach(c => {
+  const sec = document.createElement("section");
+  sec.innerHTML = `<h2>${c.clip} · ${c.name.replace(/\.mp4$/,"")}</h2><div class="meta"><span>${Math.round(c.off*100)}% of its speech is off screen · ${Math.round(c.border*100)}% of on-screen words are borderline</span></div><div class="grid"></div>`;
+  const all = document.createElement("button"); all.textContent = "Mark the whole clip voice-over";
+  sec.querySelector(".meta").appendChild(all);
+  const grid = sec.querySelector(".grid"); const cards = [];
+  c.items.forEach(it => {
+    const v = state[id(it)] || "speaking";
+    const d = document.createElement("div"); d.className = "card v-"+v + (state[id(it)]?" touched":"");
+    d.innerHTML = `<video controls preload="none" src="${it.src}"></video><div class="body"><div class="txt"></div>
+      <div class="sm">${it.start.toFixed(2)}–${it.end.toFixed(2)} s · speaker score ${it.score}</div>
+      <div class="btns"><button data-v="speaking">Speaking</button><button data-v="voiceover">Voice-over</button><button data-v="mixed">Mixed</button></div></div>`;
+    d.querySelector(".txt").textContent = it.text;
+    d.querySelectorAll(".btns button").forEach(b => { b.classList.toggle("on", b.dataset.v===v); b.onclick = () => setV(it, b.dataset.v, d); });
+    d.querySelector("video").addEventListener("play", () => { if (!state[id(it)]) setV(it, "speaking", d); });
+    grid.appendChild(d); cards.push([it,d]);
+  });
+  all.onclick = () => cards.forEach(([it,d]) => setV(it, "voiceover", d));
+  list.appendChild(sec);
+});
+document.getElementById("save").onclick = () => {
+  const decisions = [];
+  DATA.forEach(c => c.items.forEach(it => { const v = state[id(it)]; if (v) decisions.push({clip: it.clip, seg: it.seg, i0: it.i0, i1: it.i1, verdict: v, text: it.text}); }));
+  const blob = new Blob([JSON.stringify({saved: new Date().toISOString(), decisions}, null, 1)], {type: "application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "decisions.json"; a.click();
+};
+prog();
+</script></body></html>
