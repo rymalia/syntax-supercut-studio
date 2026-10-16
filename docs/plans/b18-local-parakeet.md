@@ -147,5 +147,6 @@ The current xAI log measures elapsed time around `transcribeFile` (`src/lib/serv
 - **Feature mismatch:** parakeet output has no speaker diarization, while xAI supports optional speaker fields (`src/lib/server/pipelines/transcribe.ts:12-18`, `:42-46`).
 - **Compatibility risk:** legacy transcripts have no engine metadata and should be labeled unknown.
 - **Answered 2026-10-16 (ryan):** non-English does not go to xAI; it stays local, since whisper and parakeet both cover many languages. Consequences: the local model must be a multilingual one (parakeet-tdt v3, not the English-only v2; or whisper), and the `language` field should come from the model's detection or the request, not a fixed `en` default.
-- **Open question:** should zero-word, silent clips be accepted as valid local transcripts or trigger fallback?
-- **Open question:** should the app retain raw parakeet JSON for debugging, or only the canonical transcript?
+- **Decided 2026-10-16:** a zero-word, silent clip is a valid local transcript (`words: []`), not a fallback trigger.
+- **Decided 2026-10-16:** only the canonical transcript is kept; raw parakeet JSON stays in the job temp dir.
+- **Fact 2026-10-16:** the installed CLI defaults to `mlx-community/parakeet-tdt-0.6b-v3` (multilingual). Its JSON has no language field, so local transcripts omit `language` instead of claiming `en`.
