@@ -16,7 +16,7 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 | B8 | Per-word attributes (`onscreen`, `person`, `event`) in transcripts + `hits.ts` filters; retire onscreen bucket | code | todo | B9 | |
 | B9 | `build_buckets.py` emits per-word fields | desktop | todo | | 0.1 day |
 | B10 | Speaker review page per ingest batch (`review/<batch>/`) | desktop | done | | shipped in this branch; `/review` route in app is B11 |
-| B11 | `/review` route reading `review/<batch>/items.json`, writing `decisions.json` | code | todo | B10 | replaces the standalone page |
+| B11 | `/review` route reading `review/<batch>/items.json`, writing `decisions.json` | code | done | | `GET /api/review`, `GET`/`PUT /api/review/<batch>`; clips served via `/api/engine-media/review/...`; decisions apply on the next `wordbank.py` + `build_buckets.py` |
 | B12 | Retire or re-route `/sentence` through the engine renderer | code | todo | | |
 | B13 | 30-minute labelled non-verbal event test set | ryan+desktop | todo | | pick 4 clips |
 | B14 | Detector stage (AudioSet tagger) in ingest | desktop | todo | B13 | |

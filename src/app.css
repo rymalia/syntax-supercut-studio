@@ -206,6 +206,7 @@ mark,
 }
 
 .wordmark {
+	white-space: nowrap;
 	font-size: 1.5rem;
 	font-weight: 800;
 	text-transform: uppercase;
@@ -226,7 +227,7 @@ mark,
 .nav {
 	display: flex;
 	flex-wrap: wrap;
-	gap: clamp(0.75rem, 2vw, 1.75rem);
+	gap: clamp(0.75rem, 1vw, 1.75rem);
 	margin-inline-start: auto;
 	font-weight: 600;
 	font-size: 0.95rem;

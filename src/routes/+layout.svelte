@@ -13,6 +13,7 @@
 		{ href: '/film', label: 'Film' },
 		{ href: '/people', label: 'People' },
 		{ href: '/ingest', label: 'Ingest' },
+		{ href: '/review', label: 'Review' },
 	];
 
 	let { children } = $props();

@@ -24,6 +24,12 @@ Changes are not sent upstream. Newest first; group entries by date.
 ## 2026-10-15
 
 ### Added
+- **Speaker review in the app (`/review`).** Lists the engine's per-ingest review
+  batches (`review/<batch>/`), plays each segment's preview with the detected
+  face boxed, and records Speaking / Voice-over / Mixed verdicts into the
+  batch's `decisions.json` in the shape `wordbank.py` reads. As in the old
+  standalone page, only segments you play or mark are recorded. Replaces
+  opening `review/<batch>/index.html` and moving a downloaded file into place.
 - **Naming people on `/people`.** Tick one or more clusters, type a name (new or
   existing, normalized to `lowercase_underscores`), and save; or remove a name.
   Clicking a group selects its clusters, for renaming. Writes the engine's

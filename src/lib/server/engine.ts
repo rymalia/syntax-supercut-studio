@@ -18,7 +18,7 @@ export function filmPath(slug: string): string {
 	return join(filmsDir(), `${slug}.json`);
 }
 
-/** Return a relative media path only for files within the three public engine roots. */
+/** Return a relative media path only for files within the public engine roots. */
 export function engineMediaPath(target: string): string | null {
 	const rel = relative(engineDir(), resolve(target));
 	if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`)) return null;
@@ -26,6 +26,8 @@ export function engineMediaPath(target: string): string | null {
 	if (parts[0] === 'identities' && parts.length >= 2) return rel;
 	if (parts[0] === 'proxy' && parts.length >= 2) return rel;
 	if (parts[0] === 'films' && parts[1] === 'out' && parts.length >= 3) return rel;
+	// Speaker review previews: review/clips/<f> (first review) and review/<batch>/clips/<f>.
+	if (parts[0] === 'review' && ((parts[1] === 'clips' && parts.length === 3) || (parts[2] === 'clips' && parts.length === 4))) return rel;
 	return null;
 }
 
