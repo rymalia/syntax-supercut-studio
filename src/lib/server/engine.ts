@@ -46,6 +46,102 @@ function pruneGroups() {
 	for (const pid of engineGroups) try { process.kill(-pid, 0); } catch { engineGroups.delete(pid); }
 }
 
+export interface DetachedProcessOptions {
+	cwd?: string;
+	signal?: AbortSignal;
+	onStdout?: (chunk: Buffer) => void;
+	onStderr?: (chunk: Buffer) => void;
+}
+
+export interface DetachedProcessResult {
+	code: number | null;
+	signal: NodeJS.Signals | null;
+	stderr: string;
+}
+
+/**
+ * Run a detached child in a tracked process group. Both the engine and local
+ * transcription use this so cancellation and shutdown have one owner.
+ */
+export function runDetachedProcess(
+	command: string,
+	args: string[],
+	options: DetachedProcessOptions = {},
+): Promise<DetachedProcessResult> {
+	if (options.signal?.aborted) return Promise.reject(new CancelledError());
+
+	return new Promise((resolvePromise, rejectPromise) => {
+		const child = spawn(command, args, { cwd: options.cwd, detached: true });
+		pruneGroups();
+		const pid = child.pid;
+		if (pid !== undefined) engineGroups.add(pid);
+		let stderr = '';
+		let cancelled = false;
+		let settled = false;
+
+		const finishReject = (err: Error) => {
+			if (settled) return;
+			settled = true;
+			options.signal?.removeEventListener('abort', onAbort);
+			rejectPromise(err);
+		};
+
+		const onAbort = () => {
+			cancelled = true;
+			// No pid means the spawn failed and child.kill() would signal our own group.
+			if (pid === undefined) return;
+			try {
+				process.kill(-pid, 'SIGTERM');
+			} catch {
+				try { child.kill('SIGTERM'); } catch { /* exited meanwhile */ }
+			}
+			// Watch the whole group, not the pipe: workers that log to files don't hold stdout. Stop as soon as
+			// the group is gone (so a reused pid is never signalled); SIGKILL whatever is left after 10 s.
+			const started = Date.now();
+			const sweep = setInterval(() => {
+				try {
+					process.kill(-pid, 0);
+				} catch {
+					clearInterval(sweep);
+					engineGroups.delete(pid);
+					return;
+				}
+				if (Date.now() - started >= 10_000) {
+					clearInterval(sweep);
+					try { process.kill(-pid, 'SIGKILL'); } catch { /* exited meanwhile */ }
+					engineGroups.delete(pid);
+				}
+			}, 250);
+			sweep.unref();
+		};
+		options.signal?.addEventListener('abort', onAbort, { once: true });
+		if (options.signal?.aborted) onAbort();
+
+		child.stdout?.on('data', (chunk: Buffer) => options.onStdout?.(chunk));
+		child.stderr?.on('data', (chunk: Buffer) => {
+			stderr += chunk.toString('utf8');
+			stderr = stderr.split(/\r?\n/).slice(-41).join('\n');
+			options.onStderr?.(chunk);
+		});
+		child.on('error', (err) => finishReject(cancelled ? new CancelledError() : err));
+		child.on('close', (code, signal) => {
+			if (settled) return;
+			// Keep tracking a group whose workers outlive the leader; a cancel's sweep or pruneGroups() drops it later.
+			if (!cancelled && pid !== undefined) {
+				try { process.kill(-pid, 0); } catch { engineGroups.delete(pid); }
+			}
+			options.signal?.removeEventListener('abort', onAbort);
+			if (cancelled) {
+				settled = true;
+				rejectPromise(new CancelledError());
+				return;
+			}
+			settled = true;
+			resolvePromise({ code, signal, stderr });
+		});
+	});
+}
+
 export function engineDir(): string {
 	return resolve(process.env.TH_ENGINE_DIR ?? join(homedir(), 'ResolveScripts/talking_heads'));
 }
@@ -78,90 +174,40 @@ export function runEngine(
 	signal?: AbortSignal,
 ): Promise<EngineResult> {
 	if (signal?.aborted) return Promise.reject(new CancelledError());
-	return new Promise((resolvePromise, rejectPromise) => {
-		const dir = engineDir();
-		const child = spawn(join(dir, 'asd/.venv/bin/python'), [join(dir, 'engine_cli.py'), ...args], {
-			cwd: dir,
-			detached: true,
-		});
-		pruneGroups();
-		const pid = child.pid;
-		if (pid !== undefined) engineGroups.add(pid);
-		let stdout = '';
-		let stderr = '';
-		let result: Record<string, unknown> | null = null;
-		let parseError: Error | null = null;
-		let cancelled = false;
+	const dir = engineDir();
+	let stdout = '';
+	let result: Record<string, unknown> | null = null;
+	let parseError: Error | null = null;
 
-		function accept(line: string) {
-			if (line.startsWith('LOG ')) onLog(line.slice(4));
-			else if (line.startsWith('RESULT ')) {
-				try {
-					const value: unknown = JSON.parse(line.slice(7));
-					if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid RESULT record');
-					result = value as Record<string, unknown>;
-				} catch (err) {
-					parseError = err instanceof Error ? err : new Error(String(err));
-				}
+	function accept(line: string) {
+		if (line.startsWith('LOG ')) onLog(line.slice(4));
+		else if (line.startsWith('RESULT ')) {
+			try {
+				const value: unknown = JSON.parse(line.slice(7));
+				if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid RESULT record');
+				result = value as Record<string, unknown>;
+			} catch (err) {
+				parseError = err instanceof Error ? err : new Error(String(err));
 			}
 		}
-		child.stdout.on('data', (chunk: Buffer) => {
+	}
+
+	return runDetachedProcess(join(dir, 'asd/.venv/bin/python'), [join(dir, 'engine_cli.py'), ...args], {
+		cwd: dir,
+		signal,
+		onStdout: (chunk) => {
 			stdout += chunk.toString('utf8');
 			let end: number;
 			while ((end = stdout.indexOf('\n')) !== -1) {
 				accept(stdout.slice(0, end).replace(/\r$/, ''));
 				stdout = stdout.slice(end + 1);
 			}
-		});
-		child.stderr.on('data', (chunk: Buffer) => {
-			stderr += chunk.toString('utf8');
-			const lines = stderr.split(/\r?\n/);
-			stderr = lines.slice(-41).join('\n');
-		});
-		const onAbort = () => {
-			cancelled = true;
-			// No pid means the spawn failed and 'error' will reject; child.kill() here would signal our own group.
-			if (pid === undefined) return;
-			try {
-				process.kill(-pid, 'SIGTERM');
-			} catch {
-				child.kill('SIGTERM');
-			}
-			// Watch the whole group, not the pipe: workers that log to files don't hold stdout. Stop as soon as
-			// the group is gone (so a reused pid is never signalled); SIGKILL whatever is left after 10 s.
-			const started = Date.now();
-			const sweep = setInterval(() => {
-				try {
-					process.kill(-pid, 0);
-				} catch {
-					clearInterval(sweep);
-					engineGroups.delete(pid);
-					return;
-				}
-				if (Date.now() - started >= 10_000) {
-					clearInterval(sweep);
-					try { process.kill(-pid, 'SIGKILL'); } catch { /* exited meanwhile */ }
-					engineGroups.delete(pid);
-				}
-			}, 250);
-			sweep.unref();
-		};
-		signal?.addEventListener('abort', onAbort, { once: true });
-		if (signal?.aborted) onAbort();
-		child.on('error', (err) => {
-			signal?.removeEventListener('abort', onAbort);
-			rejectPromise(cancelled ? new CancelledError() : err);
-		});
-		child.on('close', (code) => {
-			// Keep tracking a group whose workers outlive the leader; a cancel's sweep or pruneGroups() drops it later.
-			if (!cancelled && pid !== undefined) try { process.kill(-pid, 0); } catch { engineGroups.delete(pid); }
-			signal?.removeEventListener('abort', onAbort);
-			if (cancelled) return rejectPromise(new CancelledError());
-			if (stdout.trim()) accept(stdout.trim());
-			if (code === 0 && result?.ok === true) return resolvePromise(result as EngineResult);
-			const tail = stderr.trim().split(/\r?\n/).slice(-40).join('\n');
-			const reason = parseError?.message ?? (typeof result?.error === 'string' ? result.error : `Engine exited ${code ?? 'unknown'} without a successful RESULT`);
-			rejectPromise(new Error(`${reason}${tail ? `\n${tail}` : ''}`));
-		});
+		},
+	}).then(({ code, stderr }) => {
+		if (stdout.trim()) accept(stdout.trim());
+		if (code === 0 && result?.ok === true) return result as EngineResult;
+		const tail = stderr.trim().split(/\r?\n/).slice(-40).join('\n');
+		const reason = parseError?.message ?? (typeof result?.error === 'string' ? result.error : `Engine exited ${code ?? 'unknown'} without a successful RESULT`);
+		throw new Error(`${reason}${tail ? `\n${tail}` : ''}`);
 	});
 }

@@ -251,6 +251,7 @@
 					<th>Video</th>
 					<th>MP3</th>
 					<th>Transcript</th>
+					<th>Engine</th>
 					<th>Words</th>
 					<th>Runtime</th>
 					<th></th>
@@ -287,6 +288,13 @@
 						</td>
 						<td>
 							<span class="pip" class:pip-filled={row.hasTranscript}></span>
+						</td>
+						<td>
+							{#if row.transcriptEngine}
+								<span class="engine-badge">{row.transcriptEngine}</span>
+							{:else}
+								<span class="muted">—</span>
+							{/if}
 						</td>
 						<td style="font-variant-numeric: tabular-nums;">
 							{row.transcriptWords?.toLocaleString() ?? '—'}

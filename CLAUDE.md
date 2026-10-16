@@ -31,6 +31,10 @@ External runtime deps: `ffmpeg` 7+ on `PATH` (all rendering; pipelines use the `
 - `SYNTAX_REPO_DIR` — `src/hooks.server.ts` hydrates any *unset* env vars from `<this>/.env` (default `../syntax-transcripts-2026/.env`) at boot. Local `.env` wins.
 - `DRAWTEXT_FONT` — font for debug text overlays; defaults to a macOS-only path (`/System/Library/Fonts/Supplemental/Arial Black.ttf`).
 - `TH_ENGINE_DIR` — live talking-heads engine directory (default `~/ResolveScripts/talking_heads`). See below.
+- `SYNTAX_TRANSCRIBE_ENGINE` — transcription engine: `parakeet` (default) or `xai`.
+- `PARAKEET_MLX_BIN` — local parakeet-mlx executable (default `~/.local/bin/parakeet-mlx`).
+- `SYNTAX_PARAKEET_MODEL` — model passed to parakeet-mlx as `--model` (default `mlx-community/parakeet-tdt-0.6b-v3`, multilingual). The app ignores a shell-wide `PARAKEET_MODEL`.
+- `SYNTAX_TRANSCRIBE_FALLBACK` — local transcription fallback: `xai` (default) or `none`.
 
 ## Architecture
 

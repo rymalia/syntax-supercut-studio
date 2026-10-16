@@ -23,7 +23,7 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 | B15 | Typing stage: Qwen3-ASR-Enhanced on MPS, fallback laughter-Whisper | desktop | todo | B14 | MPS viability test first |
 | B16 | Events as tokens through phrase bank, buckets, solver, renderer | desktop | todo | B15 | |
 | B17 | VideoToolbox encodes for app renders (measure vs x264 first) | code | todo | | proposed by code |
-| B18 | Local parakeet-mlx as default transcription in app, xAI fallback | code | in progress | | plan `docs/plans/b18-local-parakeet.md`; non-English stays local (v3 is multilingual); silent clips are valid empty transcripts; raw parakeet JSON not kept |
+| B18 | Local parakeet-mlx as default transcription in app, xAI fallback | code | done | | plan `docs/plans/b18-local-parakeet.md`; non-English stays local (v3 is multilingual); silent clips are valid empty transcripts; raw parakeet JSON not kept. Results in the plan; xAI comparison not run (no key) |
 | B19 | Remote Control test for live agent messaging | ryan | todo | | 5 min |
 | B20 | `-hwaccel videotoolbox` decode for thumbnail strips, then raise strip concurrency | code | todo | | most sources are AV1; M4 Max decodes AV1 in hardware |
 | B21 | Cancelling an ingest/render kills the whole engine process tree (app: own process group + group kill; engine: forward SIGTERM in `stream()`) | code+desktop | app half done | | app: detached spawn, group SIGTERM, SIGKILL at 10 s, shutdown hook (`1c213b6`); engine half (forward SIGTERM in `stream()`) open; found by Codex review 2026-10-15; today `ingest_new.sh`, ffmpeg and ASD workers keep running after cancel |

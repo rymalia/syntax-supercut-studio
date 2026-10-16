@@ -18,6 +18,14 @@
 		};
 	}
 
+	interface TranscribeResult {
+		engine?: 'parakeet-mlx' | 'xai';
+		fallbackReason?: string;
+		byEngine?: { 'parakeet-mlx'?: number; xai?: number };
+		completed?: { bucket: string; slug: string; engine?: string; fallbackReason?: string }[];
+		failed?: { bucket: string; slug: string; error: string }[];
+	}
+
 	function formatDuration(sec: number): string {
 		if (!Number.isFinite(sec) || sec <= 0) return '0s';
 		const m = Math.floor(sec / 60);
@@ -135,6 +143,35 @@
 				<li>Try another person/group.</li>
 				<li>Clear cast restriction and let the engine choose.</li>
 			</ul>
+		</div>
+	{:else if jobState.job.status === 'done' && (jobState.job.kind === 'transcribe-one' || jobState.job.kind === 'transcribe-all') && jobState.job.result}
+		{@const r = jobState.job.result as TranscribeResult}
+		<div role="status" style="padding: 1.25rem; border: 1.5px solid var(--ink);">
+			{#if jobState.job.kind === 'transcribe-one'}
+				<div class="row" style="gap: 0.75rem;">
+					<span class="caps">Engine</span>
+					<span class="engine-badge">{r.engine ?? 'unknown'}</span>
+				</div>
+				{#if r.fallbackReason}
+					<p style="margin-block: 0.75rem 0;">Fallback reason: <span style="font-family: var(--font-mono);">{r.fallbackReason}</span></p>
+				{/if}
+			{:else}
+				<div class="row" style="gap: 2rem; flex-wrap: wrap;">
+					<div><div class="caps muted">Parakeet-mlx</div><div style="font-size: var(--fs-2); font-weight: 800;">{r.byEngine?.['parakeet-mlx'] ?? 0}</div></div>
+					<div><div class="caps muted">xAI fallback</div><div style="font-size: var(--fs-2); font-weight: 800;">{r.byEngine?.xai ?? 0}</div></div>
+					<div><div class="caps muted">Failed</div><div style="font-size: var(--fs-2); font-weight: 800;">{r.failed?.length ?? 0}</div></div>
+				</div>
+				{#if r.completed?.some((item) => item.fallbackReason)}
+					<div style="margin-block-start: 1rem;">
+						<div class="caps">Fallbacks</div>
+						<ul style="margin-block: 0.5rem 0; padding-inline-start: 1.25rem; font-family: var(--font-mono); font-size: var(--fs-small);">
+							{#each r.completed.filter((item) => item.fallbackReason) as item}
+								<li>{item.bucket}/{item.slug}: {item.fallbackReason}</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
+			{/if}
 		</div>
 	{:else if jobState.job.status === 'done' && jobState.job.result?.dryRun}
 		{@const r = jobState.job.result as {

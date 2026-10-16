@@ -644,6 +644,15 @@ tr:hover .pip-filled {
 	color: var(--on-accent);
 }
 
+.engine-badge {
+	display: inline-block;
+	border: 1px solid var(--ink);
+	padding: 0.2rem 0.35rem;
+	font-family: var(--font-mono);
+	font-size: var(--fs-small);
+	line-height: 1;
+}
+
 .visually-hidden {
 	position: absolute;
 	inline-size: 1px;

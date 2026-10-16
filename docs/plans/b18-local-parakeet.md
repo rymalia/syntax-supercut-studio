@@ -136,6 +136,14 @@ Run only after the active ingest finishes.
 
 The current xAI log measures elapsed time around `transcribeFile` (`src/lib/server/pipelines/transcribe.ts:181-190`); the benchmark should separately record extraction, upload, model load, and total job time.
 
+### Results (2026-10-16, implementation on `b18-wip`)
+
+- **Speed (local):** a 40.2-minute file took 22.2 s wall including WAV extraction and model load (RTF 0.0092, ~109x real time); a batch of 5 clips (~5.9 min of audio, one silent) took 6 s.
+- **Word grouping:** the app's mapping is checked against the engine's own grouping (`analyze.py` `load_words`) over every raw transcript in `TH_ENGINE_DIR/transcripts/`: 311,567 words in 350 clips, identical text and identical start/end times. The one difference, `c283`, is Russian speech: the engine's ASCII `norm()` drops Cyrillic words, while the app keeps them.
+- **xAI comparison: not run.** No `XAI_API_KEY` is available in this environment (not in the shell, a local `.env`, or `SYNTAX_REPO_DIR`). The fallback path was exercised up to the key check: per-file fallback, a clear "XAI_API_KEY ... not set" error per file, no partial transcripts.
+- **Model:** the user's shell exports `PARAKEET_MODEL=mlx-community/parakeet-tdt-0.6b-v2` (English-only), which both the app and the engine ingest inherited. The app now passes `--model` from `SYNTAX_PARAKEET_MODEL` (default v3) and records `model` in each transcript.
+- **Raw output quirk:** parakeet can write bare `NaN` (seen as a sentence `confidence` in `c242.json`), which `JSON.parse` rejects; the app reads it as `null` instead of falling back.
+
 ## 5. Risks and open questions
 
 - **Token grouping risk:** parakeet tokens are subwords and punctuation, not app words; leading-space rules need validation across more than `c01.json`.

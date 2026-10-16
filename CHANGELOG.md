@@ -15,6 +15,13 @@ Changes are not sent upstream. Newest first; group entries by date.
 ## 2026-10-16
 
 ### Added
+- **Local transcription with per-file xAI fallback.** `/transcribe` now uses the
+  multilingual local `parakeet-mlx` engine by default, keeps valid silent clips
+  as empty transcripts, and uploads only failed files to xAI when fallback is
+  enabled. Library rows and job output show the engine and fallback reason.
+  Words are grouped exactly as the engine groups them, and the multilingual v3
+  model is passed explicitly (`SYNTAX_PARAKEET_MODEL`), so a shell-wide
+  `PARAKEET_MODEL` pinning the English-only v2 no longer applies to the app.
 - **People: hide named clusters, search by name.** `/people` has a "Hide named
   clusters" toggle (remembered per browser) that leaves only the clusters still to
   identify, with an unnamed count. People search on `/people` and `/film` also

@@ -95,7 +95,9 @@
 		<mark>Transcribe</mark>.
 	</h1>
 	<p class="muted">
-		Upload media to xAI's speech-to-text API and save word-level transcripts.
+		Transcription runs locally by default with parakeet-mlx. If local transcription fails,
+		the audio is uploaded to xAI as a fallback. You can also choose xAI explicitly in the
+		server environment.
 		{data.transcribedCount} transcribed; {data.missing.length} missing across
 		{data.buckets.length} bucket{data.buckets.length === 1 ? '' : 's'}.
 	</p>

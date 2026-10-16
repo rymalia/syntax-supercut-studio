@@ -15,6 +15,7 @@ export interface VideoRow {
 	mp3SizeMB: number | null;
 	transcriptWords: number | null;
 	transcriptDurationSec: number | null;
+	transcriptEngine: 'parakeet-mlx' | 'xai' | 'unknown' | null;
 	hasVideo: boolean;
 	hasMp3: boolean;
 	hasTranscript: boolean;
@@ -82,12 +83,16 @@ export const load: PageServerLoad = async () => {
 
 			let words: number | null = null;
 			let durationSec: number | null = null;
+			let engine: VideoRow['transcriptEngine'] = null;
 			if (tFile) {
 				try {
 					const json = JSON.parse(await readFile(join(bucket.transcriptsDir, tFile), 'utf8'));
 					words = Array.isArray(json.words) ? json.words.length : 0;
 					durationSec = typeof json.duration === 'number' ? json.duration : null;
-				} catch {}
+					engine = json.engine === 'parakeet-mlx' || json.engine === 'xai' ? json.engine : 'unknown';
+				} catch {
+					engine = 'unknown';
+				}
 			}
 
 			rows.push({
@@ -101,6 +106,7 @@ export const load: PageServerLoad = async () => {
 				mp3SizeMB: m ? Number((m.size / 1024 / 1024).toFixed(1)) : null,
 				transcriptWords: words,
 				transcriptDurationSec: durationSec,
+				transcriptEngine: engine,
 				hasVideo: Boolean(v),
 				hasMp3: Boolean(m),
 				hasTranscript: Boolean(tFile),
