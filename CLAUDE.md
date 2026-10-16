@@ -4,6 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a fork of wesbos/syntax-supercut-studio that is no longer sent upstream. Record major user-visible changes in `CHANGELOG.md` (baseline tag: `upstream-baseline`).
 
+## Agent coordination
+
+Two agents work on this project: Claude Code owns the app (this repo's `src/`), Claude Desktop owns the talking-heads engine (`TH_ENGINE_DIR`, the `engine/` snapshot, ingest scripts, film scripts, people naming). The boundary is `docs/ENGINE_CONTRACT.md`; the plan is `docs/Talking Heads × Supercut Studio Assessment and Roadmap.md`.
+
+- At the start of a session, read `docs/agents/BOARD.md` and `docs/agents/inbox/code.md`. Claim a task by setting Owner and Status in the commit that starts it; mark inbox lines `[x]` when handled; write to `docs/agents/inbox/desktop.md` instead of editing `engine/` or the live engine.
+- Desktop hands work over as branches made in throwaway worktrees. Before fast-forwarding one: no attribution trailers in its commits, every changed `engine/` file identical to the live copy in `TH_ENGINE_DIR`, and `git merge --ff-only` succeeds.
+- The user's dev server runs from this checkout; avoid `git stash` and branch switching while it runs.
+
 ## Commands
 
 ```sh
