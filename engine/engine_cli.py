@@ -164,14 +164,27 @@ def stream(cmd, cwd=HERE, env=None):
 
 def cmd_ingest(a):
     log("ingest: audio -> parakeet -> faces -> ASD (MPS) -> word bank")
+    before = {l.split("\t")[0] for l in open(os.path.join(HERE, "clips.tsv")) if l.strip()}
     rc = stream(["bash", os.path.join(HERE, "ingest_new.sh")])
     if rc != 0: fail(f"ingest_new.sh exited {rc}")
     new = [l.split("\t")[0] for l in open(os.path.join(HERE, "clips.tsv")) if l.strip() and not os.path.exists(os.path.join(HERE, "identities", l.split("\t")[0] + ".json"))]
+    added = [l.split("\t")[0] for l in open(os.path.join(HERE, "clips.tsv")) if l.strip() and l.split("\t")[0] not in before]
     if new:
         log(f"identities for {len(new)} clips"); stream([PY, os.path.join(HERE, "identities.py")] + new)
     log("phrase bank"); stream([PY, os.path.join(HERE, "phrasebank.py")])
+    log("build buckets")
+    buckets = stream(["python3", os.path.join(HERE, "build_buckets.py")]) == 0
+    if not buckets: log("WARNING: build_buckets.py failed; continuing")
+    review_batch = None
+    if added:
+        batch = f"{added[0]}-{added[-1]}"
+        log(f"speaker review batch {batch}")
+        if stream(["python3", os.path.join(HERE, "review_build.py"), "20", "--batch", batch, "--only"] + added) == 0:
+            review_batch = batch
+        else:
+            log("WARNING: review_build.py failed; continuing")
     n = sum(1 for l in open(os.path.join(HERE, "clips.tsv")) if l.strip())
-    result({"ok": True, "clips": n, "new_identities": new})
+    result({"ok": True, "clips": n, "new_identities": new, "buckets": buckets, "review_batch": review_batch})
 
 def cmd_stats(a):
     rows = []

@@ -18,6 +18,7 @@
 <section class="hero stack-tight">
 	<h1><mark>Ingest</mark> clips.</h1>
 	<p class="muted">Process new talking-head videos from the engine's configured Downloads folder. This can take a while.</p>
+	<p class="muted">Ingest also refreshes the <a href="/">Library</a> and builds a <a href="/review">speaker review batch</a> for new clips.</p>
 </section>
 <section class="split">
 	<div class="stack">

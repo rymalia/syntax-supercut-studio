@@ -24,6 +24,7 @@ Changes are not sent upstream. Newest first; group entries by date.
 ## 2026-10-15
 
 ### Added
+- **Ingest refreshes Library and review.** Running `/ingest` now refreshes Library buckets and builds a speaker review batch for newly added clips.
 - **Speaker review in the app (`/review`).** Lists the engine's per-ingest review
   batches (`review/<batch>/`), plays each segment's preview with the detected
   face boxed, and records Speaking / Voice-over / Mixed verdicts into the

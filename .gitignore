@@ -43,3 +43,4 @@ yarn-error.log*
 
 # Agent handoff notes (local scratch)
 .baton/
+__pycache__/

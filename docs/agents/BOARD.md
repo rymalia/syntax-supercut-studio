@@ -26,3 +26,4 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 | B18 | Local parakeet-mlx as default transcription in app, xAI fallback | code | todo | | proposed by code |
 | B19 | Remote Control test for live agent messaging | ryan | todo | | 5 min |
 | B20 | `-hwaccel videotoolbox` decode for thumbnail strips, then raise strip concurrency | code | todo | | most sources are AV1; M4 Max decodes AV1 in hardware |
+| B21 | Cancelling an ingest/render kills the whole engine process tree (app: own process group + group kill; engine: forward SIGTERM in `stream()`) | code+desktop | todo | | found by Codex review 2026-10-15; today `ingest_new.sh`, ffmpeg and ASD workers keep running after cancel |

@@ -25,7 +25,7 @@ Long commands (`render`, `ingest`, `qa`) must honour the job `AbortSignal`: kill
 | `plan --film <path> [--sheet]` | | `{name, plan, snippets: [...], lines, takes_per_line, persons, speech_seconds, sheet?}` — `plan`/`sheet` are absolute paths under `<TH_ENGINE_DIR>/films/out/`. |
 | `render --film <path> [--draft]` | | `{name, outFile, plan, snippets, lines, takes_per_line, persons}` — `outFile` is the absolute mp4 path under `<TH_ENGINE_DIR>/films/out/`. LOG lines `progress i/n ...` while snippets render. |
 | `qa --name <name> [--no-sheet]` | after render | the QA record: `{name, cold, heard, total, ghosts, gate, missed, line_match, line_total, report: [..], acoustic: {...}, sheets: [paths]}`. |
-| `ingest` | — | `{clips, new_identities}` — long (minutes to an hour); streams LOG. Processes any media in `~/Downloads/talking-heads-videos` not yet in `clips.tsv`. |
+| `ingest` | — | `{clips, new_identities, buckets, review_batch}` where `buckets` is whether the Library bucket refresh succeeded and `review_batch` is the successful `<first>-<last>` speaker-review batch or `null` — long (minutes to an hour); streams LOG. Processes any media in `~/Downloads/talking-heads-videos` not yet in `clips.tsv`, then refreshes buckets and builds a review batch for clips added in this run (both post-ingest steps are tolerated if they fail). |
 | `stats` | — | `{people: [{person, words, runs4, longest, clip_name}]}` ranked by admissible on-screen words. |
 
 ## Film JSON (what the `/film` editor saves to `<TH_ENGINE_DIR>/films/<slug>.json`)
