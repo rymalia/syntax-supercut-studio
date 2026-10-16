@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { basename } from 'node:path';
 import { CancelledError, throwIfAborted } from './ffmpeg.js';
+import { logActivity } from './activity.js';
 import { listBuckets, resolveBuckets } from './paths.js';
 import { generateMissingThumbs } from './thumbs.js';
 import { filmPath, runEngine, type EngineResult } from './engine.js';
@@ -78,6 +80,35 @@ function addLog(job: Job, line: string) {
 	}
 }
 
+function activityTarget(kind: JobKind, params: unknown): string {
+	if (!params || typeof params !== 'object') return '';
+	const values = params as Record<string, unknown>;
+	switch (kind) {
+		case 'supercut': return typeof values.target === 'string' ? values.target : typeof values.regexSource === 'string' ? values.regexSource : '';
+		case 'sentence': return typeof values.sentence === 'string' ? values.sentence : '';
+		case 'songify': return typeof values.target === 'string' ? values.target : '';
+		case 'transcribe-one': {
+			const bucket = typeof values.bucket === 'string' ? values.bucket : '';
+			const slug = typeof values.slug === 'string' ? values.slug : '';
+			return bucket && slug ? `${bucket}/${slug}` : slug || bucket;
+		}
+		case 'film-plan':
+		case 'film-render': return typeof values.slug === 'string' ? values.slug : '';
+		case 'thumbs':
+		case 'transcribe-all': return Array.isArray(values.buckets) ? values.buckets.filter((v): v is string => typeof v === 'string').join(', ') : '';
+		case 'ingest': return '';
+	}
+}
+
+function activityResult(status: 'done' | 'cancelled' | 'error', result: unknown, message?: string): string {
+	if (status === 'cancelled') return 'cancelled';
+	if (status === 'error') return `error: ${(message ?? '').split(/\r?\n/, 1)[0]}`;
+	const outFile = result && typeof result === 'object' && typeof (result as { outFile?: unknown }).outFile === 'string'
+		? basename((result as { outFile: string }).outFile)
+		: '';
+	return outFile ? `done: ${outFile}` : 'done';
+}
+
 export function getJob(id: string): Job | undefined {
 	return jobs.get(id);
 }
@@ -128,6 +159,7 @@ function runInBackground<K extends JobKind, P, R>(
 			job.result = result;
 			job.status = 'done';
 			job.finishedAt = Date.now();
+			void logActivity(`job:${job.kind}`, activityTarget(job.kind, job.params), activityResult('done', result));
 		})
 		.catch((err) => {
 			const msg = err instanceof Error ? err.message : String(err);
@@ -140,6 +172,11 @@ function runInBackground<K extends JobKind, P, R>(
 				addLog(job as Job, `ERROR: ${msg}`);
 			}
 			job.finishedAt = Date.now();
+			void logActivity(
+				`job:${job.kind}`,
+				activityTarget(job.kind, job.params),
+				activityResult(job.status === 'cancelled' ? 'cancelled' : 'error', null, msg),
+			);
 		})
 		.finally(() => {
 			controllers.delete(job.id);

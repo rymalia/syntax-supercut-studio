@@ -49,3 +49,10 @@ Add a second media root for these (read-only, same path-traversal guard as bucke
 ## Montage (their supercut mode) on our data
 Transcripts for the engine's clips are mirrored into the buckets `talking-heads` (all words) and `talking-heads-onscreen`
 (on-screen words only, with `|` separator tokens where words were removed). Existing `supercut`/`sentence` jobs keep working on them.
+
+## Activity log
+
+The shared append-only activity log is `<TH_ENGINE_DIR>/activity.jsonl`. Each write is one JSON object on one line:
+`{"ts":"<ISO-8601>","actor":"app|desktop|code","action":"...","target":"...","result":"..."}`.
+The app writes `actor: "app"`; `engine_cli.py` may append `actor: "desktop"` lines, and other code may use `actor: "code"`.
+Writers append without rewriting the file, and readers skip malformed lines.

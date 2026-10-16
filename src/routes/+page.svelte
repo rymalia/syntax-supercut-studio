@@ -1,8 +1,23 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import { invalidateAll, goto } from '$app/navigation';
 
 	let { data }: { data: PageData } = $props();
+	type ActivityEntry = { ts: string; actor: 'app' | 'desktop' | 'code'; action: string; target: string; result: string };
+	let activity = $state<ActivityEntry[]>([]);
+	let showAllActivity = $state(false);
+
+	onMount(async () => {
+		try {
+			const res = await fetch('/api/activity?limit=20');
+			if (!res.ok) return;
+			const body = await res.json();
+			if (Array.isArray(body.entries)) activity = body.entries;
+		} catch {
+			// Activity is supplementary; the Library remains usable when the log is unavailable.
+		}
+	});
 
 	let filter = $state('');
 	let showOnlyMissing = $state(false);
@@ -126,6 +141,35 @@
 		Every video, its <code>.mp3</code> audio, and word-level transcript &mdash; grouped by bucket.
 	</p>
 </section>
+
+{#if activity.length}
+	<section class="stack-tight" aria-label="Recent activity">
+		<div class="row" style="justify-content: space-between;">
+			<h3>Recent activity</h3>
+			{#if activity.length > 5}
+				<button type="button" class="btn-ghost btn-small" onclick={() => (showAllActivity = !showAllActivity)}>{showAllActivity ? 'Show latest 5' : `Show all ${activity.length}`}</button>
+			{/if}
+		</div>
+		<div style="overflow-x: auto;">
+			<table>
+				<thead>
+					<tr><th>Time</th><th>Actor</th><th>Action</th><th>Target</th><th>Result</th></tr>
+				</thead>
+				<tbody>
+					{#each showAllActivity ? activity : activity.slice(0, 5) as entry, i (i)}
+						<tr>
+							<td class="muted" style="white-space: nowrap;">{new Date(entry.ts).toLocaleString()}</td>
+							<td class="caps">{entry.actor}</td>
+							<td>{entry.action}</td>
+							<td>{entry.target || '—'}</td>
+							<td>{entry.result}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</section>
+{/if}
 
 <section class="stack">
 	<div class="row" style="gap: 3rem;">

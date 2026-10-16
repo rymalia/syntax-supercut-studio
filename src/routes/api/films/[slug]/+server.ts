@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import type { RequestHandler } from './$types';
 import { filmPath, filmsDir } from '$lib/server/engine';
+import { logActivity } from '$lib/server/activity';
 
 function pathFor(slug: string): string {
 	try { return filmPath(slug); } catch { throw error(400, 'Invalid film slug'); }
@@ -34,5 +35,6 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 	} finally {
 		await unlink(temp).catch(() => {});
 	}
+	void logActivity('film:save', params.slug, 'saved');
 	return json({ ok: true, slug: params.slug });
 };

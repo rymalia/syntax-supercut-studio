@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { runEngine } from '$lib/server/engine';
+import { logActivity } from '$lib/server/activity';
 import { assignIds, NAME_RE, PeopleFileError, readPeopleNames, updatePeopleNames } from '$lib/server/people';
 
 /**
@@ -26,6 +27,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		const saved = await updatePeopleNames(version, (names) => assignIds(names, unique, name as string | null));
 		if (!saved) throw error(409, 'people.json changed since this page loaded; reload and try again');
+		void logActivity(name === null ? 'people:unname' : 'people:name', name ?? '', unique.join(', '));
 		return json({ ok: true, names: saved.names, names_version: saved.version });
 	} catch (err) {
 		if (err instanceof PeopleFileError) throw error(400, err.message);

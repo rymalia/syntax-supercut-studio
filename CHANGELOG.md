@@ -24,6 +24,7 @@ Changes are not sent upstream. Newest first; group entries by date.
 ## 2026-10-15
 
 ### Added
+- **Shared activity log.** The app records job completions and successful edits in `<TH_ENGINE_DIR>/activity.jsonl` and shows the latest entries on the Library.
 - **Ingest refreshes Library and review.** Running `/ingest` now refreshes Library buckets and builds a speaker review batch for newly added clips.
 - **Speaker review in the app (`/review`).** Lists the engine's per-ingest review
   batches (`review/<batch>/`), plays each segment's preview with the detected
