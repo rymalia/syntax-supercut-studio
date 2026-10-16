@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { CancelledError, throwIfAborted } from './ffmpeg.js';
-import { listBuckets } from './paths.js';
+import { listBuckets, resolveBuckets } from './paths.js';
 import { generateMissingThumbs } from './thumbs.js';
 import { filmPath, runEngine, type EngineResult } from './engine.js';
 import { buildSupercut, type SupercutOptions, type SupercutResult } from './pipelines/supercut.js';
@@ -15,7 +15,7 @@ import {
 	type TranscribeAllMissingResult,
 } from './pipelines/transcribe.js';
 
-export type JobKind = 'supercut' | 'sentence' | 'songify' | 'transcribe-one' | 'transcribe-all' | 'film-plan' | 'film-render' | 'ingest';
+export type JobKind = 'supercut' | 'sentence' | 'songify' | 'transcribe-one' | 'transcribe-all' | 'film-plan' | 'film-render' | 'ingest' | 'thumbs';
 
 export type JobStatus = 'running' | 'done' | 'error' | 'cancelled';
 
@@ -39,7 +39,17 @@ export type Job =
 	| JobBase<'transcribe-all', TranscribeAllMissingOptions, TranscribeAllMissingResult>
 	| JobBase<'film-plan', { slug: string }, EngineResult>
 	| JobBase<'film-render', { slug: string; draft?: boolean }, EngineResult>
-	| JobBase<'ingest', Record<string, never>, EngineResult>;
+	| JobBase<'ingest', Record<string, never>, EngineResult>
+	| JobBase<'thumbs', ThumbsParams, ThumbsResult>;
+
+export interface ThumbsParams {
+	buckets: string[] | null;
+}
+
+export interface ThumbsResult {
+	generated: number;
+	failed: number;
+}
 
 export interface SerializableSupercutParams {
 	target?: string;
@@ -209,6 +219,22 @@ export function startIngest(): Job {
 		const thumbs = await generateMissingThumbs(await listBuckets(), onLog, signal);
 		throwIfAborted(signal);
 		return { ...ingest, thumbs };
+	});
+	return job;
+}
+
+/**
+ * Backfill Library hover strips for every video without a current one. The
+ * engine's ingest_all.sh POSTs this after rebuilding the buckets.
+ */
+export function startThumbs(params: ThumbsParams): Job {
+	const job = baseJob<'thumbs', ThumbsParams, ThumbsResult>('thumbs', params);
+	runInBackground(job, async (onLog, signal) => {
+		const buckets = await resolveBuckets(params.buckets);
+		onLog(`Checking hover strips in ${buckets.map((b) => b.name).join(', ')}...`);
+		const result = await generateMissingThumbs(buckets, onLog, signal);
+		throwIfAborted(signal);
+		return result;
 	});
 	return job;
 }

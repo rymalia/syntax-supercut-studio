@@ -10,6 +10,7 @@ import {
 	startFilmPlan,
 	startFilmRender,
 	startIngest,
+	startThumbs,
 } from '$lib/server/jobs';
 
 function asStringArray(value: unknown): string[] | null {
@@ -37,6 +38,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			const { slug, draft } = body as Record<string, unknown>;
 			if (typeof slug !== 'string' || !/^[a-z0-9_-]+$/.test(slug)) throw error(400, 'Invalid film slug');
 			const job = kind === 'film-plan' ? startFilmPlan({ slug }) : startFilmRender({ slug, draft: draft === true });
+			return json({ id: job.id });
+		}
+		case 'thumbs': {
+			const job = startThumbs({ buckets });
 			return json({ id: job.id });
 		}
 		case 'ingest': {

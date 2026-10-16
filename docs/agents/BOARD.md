@@ -10,7 +10,7 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 | B2 | Stable cluster ids in `identities.py` | desktop | todo | | re-run all 179 clips (~1 h GPU) |
 | B3 | `engine_cli.py ingest --dry-run` (lists new sources, no work) | desktop | todo | | |
 | B4 | "Check for new sources" button + count on `/ingest` | code | todo | B3 | |
-| B5 | `thumbs` job kind; `ingest_all.sh` already POSTs it | code | doing | | hook landed desktop-side, soft-fails; then run once to warm all 358 strips and check the hover popover in the light theme |
+| B5 | `thumbs` job kind; `ingest_all.sh` already POSTs it | code | done | | `POST /api/jobs {kind:"thumbs", buckets?}`; first run warmed all 358 strips in 60 s, re-run 0.01 s; light theme checked |
 | B6 | `activity.jsonl` written by `jobs.ts` and `engine_cli.py`; last-20 panel on Library | code | todo | | line format: `{ts, actor, action, target, result}` |
 | B7 | `notes` fields on films and people, editable in UI | code | todo | | |
 | B8 | Per-word attributes (`onscreen`, `person`, `event`) in transcripts + `hits.ts` filters; retire onscreen bucket | code | todo | B9 | |
@@ -25,4 +25,4 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 | B17 | VideoToolbox encodes for app renders (measure vs x264 first) | code | todo | | proposed by code |
 | B18 | Local parakeet-mlx as default transcription in app, xAI fallback | code | todo | | proposed by code |
 | B19 | Remote Control test for live agent messaging | ryan | todo | | 5 min |
-| B20 | `-hwaccel videotoolbox` decode for thumbnail strips, then raise strip concurrency | code | todo | B5 | most sources are AV1; M4 Max decodes AV1 in hardware |
+| B20 | `-hwaccel videotoolbox` decode for thumbnail strips, then raise strip concurrency | code | todo | | most sources are AV1; M4 Max decodes AV1 in hardware |
