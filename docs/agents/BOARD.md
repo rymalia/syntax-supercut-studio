@@ -17,7 +17,7 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 | B9 | `build_buckets.py` emits per-word fields | desktop | todo | | 0.1 day |
 | B10 | Speaker review page per ingest batch (`review/<batch>/`) | desktop | done | | shipped in this branch; `/review` route in app is B11 |
 | B11 | `/review` route reading `review/<batch>/items.json`, writing `decisions.json` | code | done | | `GET /api/review`, `GET`/`PUT /api/review/<batch>`; clips served via `/api/engine-media/review/...`; decisions apply on the next `wordbank.py` + `build_buckets.py` |
-| B12 | Retire or re-route `/sentence` through the engine renderer | code | in progress | | plan `docs/plans/b12-sentence-on-engine.md`; decisions 2026-10-16: one line, no auto-split; BucketPicker removed; seed deferred to desktop; captions + draft replace debug; optional cast; old pipeline deleted |
+| B12 | Retire or re-route `/sentence` through the engine renderer | code | done | | plan `docs/plans/b12-sentence-on-engine.md`; decisions 2026-10-16: one line, no auto-split; BucketPicker removed; seed deferred to desktop; captions + draft replace debug; optional cast; old pipeline deleted. Shipped: check → render → qa via a temp film JSON; qa needs a short-lived copy in `films/` (see desktop inbox) |
 | B13 | 30-minute labelled non-verbal event test set | ryan+desktop | todo | | pick 4 clips |
 | B14 | Detector stage (AudioSet tagger) in ingest | desktop | todo | B13 | |
 | B15 | Typing stage: Qwen3-ASR-Enhanced on MPS, fallback laughter-Whisper | desktop | todo | B14 | MPS viability test first |

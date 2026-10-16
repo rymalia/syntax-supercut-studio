@@ -1,274 +1,146 @@
-import { readdir, readFile, mkdir, rm, writeFile } from 'node:fs/promises';
-import { basename, join, resolve as resolvePath } from 'node:path';
-import { resolveBuckets, type Bucket } from '../paths.js';
-import { runFfmpeg, throwIfAborted, type LogFn } from '../ffmpeg.js';
-import { normalize, slugify, timestampSuffix, type Hit, type Transcript } from '../text.js';
-import { findVideoForTranscriptInBucket } from '../hits.js';
-import { drawTextFilter } from '../drawtext.js';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { filmPath, runEngine, type EngineResult } from '../engine.js';
+import { slugify } from '../text.js';
+import { CancelledError, type LogFn } from '../ffmpeg.js';
 
-const CANVAS_W = 1280;
-const CANVAS_H = 720;
-
-const PAD_BEFORE = 0.02;
-const PAD_AFTER = 0.04;
-
-function mulberry32(seed: number): () => number {
-	let t = seed >>> 0;
-	return () => {
-		t = (t + 0x6d2b79f5) >>> 0;
-		let r = t;
-		r = Math.imul(r ^ (r >>> 15), r | 1);
-		r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
-		return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
-	};
-}
-
-async function buildWordIndex(buckets: Bucket[]): Promise<Map<string, Hit[]>> {
-	const index = new Map<string, Hit[]>();
-
-	for (const bucket of buckets) {
-		let files: string[] = [];
-		try {
-			files = (await readdir(bucket.transcriptsDir)).filter((f) => f.endsWith('.json'));
-		} catch {
-			continue;
-		}
-
-		for (const f of files) {
-			const videoPath = await findVideoForTranscriptInBucket(f, bucket);
-			if (!videoPath) continue;
-			const data: Transcript = JSON.parse(
-				await readFile(join(bucket.transcriptsDir, f), 'utf8'),
-			);
-			if (!data.words) continue;
-
-			for (const w of data.words) {
-				const key = normalize(w.text);
-				if (!key) continue;
-				const dur = w.end - w.start;
-				if (dur <= 0 || dur > 2.0) continue;
-				if (!index.has(key)) index.set(key, []);
-				index.get(key)!.push({
-					video: videoPath,
-					start: Math.max(0, w.start - PAD_BEFORE),
-					end: Math.min(data.duration, w.end + PAD_AFTER),
-					word: w.text,
-				});
-			}
-		}
-	}
-	return index;
-}
-
-function findHitsForWord(
-	target: string,
-	index: Map<string, Hit[]>,
-): { key: string; hits: Hit[] } | null {
-	const norm = normalize(target);
-	if (!norm) return null;
-	const variants = [
-		norm,
-		norm.replace(/'s$/, ''),
-		norm.replace(/s$/, ''),
-		norm.replace(/es$/, ''),
-		norm.replace(/ies$/, 'y'),
-		norm.replace(/ing$/, ''),
-		norm.replace(/ing$/, 'e'),
-		norm.replace(/ed$/, ''),
-		norm.replace(/ed$/, 'e'),
-		norm + 's',
-	];
-	for (const v of variants) {
-		const hits = index.get(v);
-		if (hits && hits.length > 0) return { key: v, hits };
-	}
-	return null;
-}
-
-async function renderWord(
-	hit: Hit,
-	outPath: string,
-	onLog: LogFn,
-	signal?: AbortSignal,
-	debug = false,
-): Promise<void> {
-	const duration = hit.end - hit.start;
-	const scaleChain = `scale=${CANVAS_W}:${CANVAS_H}:force_original_aspect_ratio=decrease,pad=${CANVAS_W}:${CANVAS_H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30`;
-	const vf = debug ? `${scaleChain},${drawTextFilter(hit.word)}` : scaleChain;
-	await runFfmpeg(
-		[
-			'-ss',
-			hit.start.toFixed(3),
-			'-i',
-			hit.video,
-			'-t',
-			duration.toFixed(3),
-			'-vf',
-			vf,
-			'-c:v',
-			'libx264',
-			'-preset',
-			'veryfast',
-			'-crf',
-			'20',
-			'-pix_fmt',
-			'yuv420p',
-			'-c:a',
-			'aac',
-			'-ar',
-			'48000',
-			'-ac',
-			'2',
-			'-b:a',
-			'192k',
-			outPath,
-		],
-		onLog,
-		signal,
-	);
-}
-
-export interface SentenceOptions {
+export interface SentenceParams {
 	sentence: string;
-	seed?: number;
-	buckets?: string[] | null;
-	outDir?: string;
-	/** When true, burn the spoken word onto each clip in big bold text. */
-	debug?: boolean;
+	cast?: string[] | null;
+	captions?: boolean;
+	speakerLabels?: boolean;
+	draft?: boolean;
+}
+
+export interface SentenceOptions extends SentenceParams {
 	onLog?: LogFn;
 	signal?: AbortSignal;
 }
 
+export interface SentenceCheckLine {
+	line: number;
+	speaker: string;
+	text: string;
+	ok: boolean;
+	takes?: unknown[];
+	why?: string;
+}
+
+export interface SentenceCheckFilm {
+	ok: boolean;
+	why?: string;
+	[key: string]: unknown;
+}
+
+export interface SentenceCheckResult extends EngineResult {
+	name: string;
+	lines: SentenceCheckLine[];
+	film: SentenceCheckFilm;
+}
+
 export interface SentenceResult {
-	outFile: string;
-	picks: { token: string; matchedAs: string; word: string; video: string }[];
-	missing: string[];
+	status: 'rendered' | 'cannot-build';
+	check: SentenceCheckResult;
+	outFile?: string;
+	plan?: string;
+	qa?: EngineResult | { ok: false; error: string } | null;
+}
+
+function asSentenceCheck(result: EngineResult): SentenceCheckResult {
+	const lines = Array.isArray(result.lines) ? result.lines : [];
+	const film = result.film;
+	if (
+		typeof result.name !== 'string' ||
+		!film ||
+		typeof film !== 'object' ||
+		Array.isArray(film) ||
+		typeof (film as Record<string, unknown>).ok !== 'boolean'
+	) {
+		throw new Error('Engine returned an invalid sentence check result');
+	}
+	return { ...result, name: result.name, lines: lines as SentenceCheckLine[], film: film as SentenceCheckFilm };
+}
+
+function outputPath(result: EngineResult, field: 'outFile' | 'plan'): string {
+	const value = result[field];
+	if (typeof value !== 'string' || !value) throw new Error(`Engine render result has no ${field}`);
+	return value;
+}
+
+/** Sentence film names: `sentence-<slug>-<uuid>`. `/api/films` hides QA copies by this shape. */
+export const SENTENCE_FILM_NAME = /^sentence-[a-z0-9-]*-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * `qa` only takes a name and reads `films/<name>.json`, so the film is copied there
+ * for the duration of the call. A QA failure is reported, not thrown: the video
+ * is already rendered by then.
+ */
+async function runQa(
+	name: string,
+	film: Record<string, unknown>,
+	onLog: LogFn,
+	signal?: AbortSignal,
+): Promise<EngineResult | { ok: false; error: string }> {
+	const copy = filmPath(name);
+	let written = false;
+	try {
+		await writeFile(copy, JSON.stringify(film, null, 2), { flag: 'wx' });
+		written = true;
+		return await runEngine(['qa', '--name', name], onLog, signal);
+	} catch (err) {
+		if (err instanceof CancelledError) throw err;
+		const error = err instanceof Error ? err.message : String(err);
+		onLog(`QA failed; the video is still available: ${error.split('\n')[0]}`);
+		return { ok: false, error };
+	} finally {
+		// Only remove the copy this call wrote; 'wx' refused anything already there.
+		if (written) await rm(copy, { force: true });
+	}
 }
 
 export async function buildSentence(opts: SentenceOptions): Promise<SentenceResult> {
 	const onLog = opts.onLog ?? (() => {});
-	const signal = opts.signal;
-	const debug = opts.debug ?? false;
-
-	const buckets = await resolveBuckets(opts.buckets);
-	if (buckets.length === 0) throw new Error('No buckets available');
-	const outDir = opts.outDir ?? buckets[0].supercutsDir;
-	onLog(`Buckets: ${buckets.map((b) => b.name).join(', ')}`);
-
 	const sentence = opts.sentence.trim();
 	if (!sentence) throw new Error('Sentence is empty');
 
-	const seed = opts.seed ?? Math.floor(Math.random() * 2 ** 31);
-	const rand = mulberry32(seed);
-	onLog(`Seed: ${seed}`);
-
-	onLog('Indexing transcripts...');
-	const index = await buildWordIndex(buckets);
-	onLog(`Indexed ${index.size} unique words.`);
-
-	const tokens = sentence.split(/\s+/).filter(Boolean);
-	onLog(`Building sentence: "${sentence}" (${tokens.length} words)`);
-
-	const picks: { token: string; hit: Hit; matchedAs: string }[] = [];
-	const missing: string[] = [];
-	let lastVideo: string | null = null;
-
-	for (const token of tokens) {
-		const result = findHitsForWord(token, index);
-		if (!result) {
-			onLog(`  x no clip for "${token}"`);
-			missing.push(token);
-			continue;
-		}
-		const { key, hits } = result;
-		const fromOther = hits.filter((h) => h.video !== lastVideo);
-		const pool = fromOther.length > 0 ? fromOther : hits;
-		const hit = pool[Math.floor(rand() * pool.length)];
-		picks.push({ token, hit, matchedAs: key });
-		lastVideo = hit.video;
-		const keyNote = key === normalize(token) ? '' : ` (matched "${key}")`;
-		onLog(`  ok ${token.padEnd(16)} -> "${hit.word}"${keyNote}`);
-	}
-
-	if (picks.length === 0) throw new Error('No words could be matched');
-
-	await mkdir(outDir, { recursive: true });
-	const slug = slugify(sentence).slice(0, 80);
-	const workDir = join(outDir, `.tmp-sentence-${slug}-${Date.now()}`);
-	await rm(workDir, { recursive: true, force: true });
-	await mkdir(workDir, { recursive: true });
+	// The engine derives file names from the film name and mangles quotes (`there's`
+	// broke its captions path), so keep it to the film-slug alphabet.
+	const slug = slugify(sentence).replace(/[^a-z0-9-]+/g, '-').slice(0, 48).replace(/^-+|-+$/g, '') || 'sentence';
+	const filmName = `sentence-${slug}-${randomUUID()}`;
+	const tempDir = await mkdtemp(join(tmpdir(), 'syntax-sentence-'));
+	const filmFile = join(tempDir, `${filmName}.json`);
+	const film: Record<string, unknown> = {
+		title: 'Sentence',
+		speaker_labels: opts.speakerLabels ?? false,
+		captions: opts.captions ?? true,
+		lines: [{ speaker: 'SENTENCE', text: sentence }],
+	};
+	if (opts.cast?.length) film.cast = opts.cast;
 
 	try {
-		const clipPaths: string[] = [];
-		for (let i = 0; i < picks.length; i++) {
-			throwIfAborted(signal);
-			const clipPath = join(workDir, `word-${String(i).padStart(4, '0')}.mp4`);
-			await renderWord(picks[i].hit, clipPath, onLog, signal, debug);
-			clipPaths.push(clipPath);
+		await writeFile(filmFile, JSON.stringify(film, null, 2));
+		onLog(`Checking sentence: "${sentence}"`);
+		const check = asSentenceCheck(await runEngine(['check', '--film', filmFile], onLog, opts.signal));
+		if (!check.film.ok) {
+			onLog('Cannot build sentence.');
+			return { status: 'cannot-build', check };
 		}
 
-		const stamp = timestampSuffix();
-		const bucketTag = buckets.length > 1 ? 'mixed' : buckets[0].name;
-		const debugTag = debug ? '-debug' : '';
-		const outFile = join(outDir, `sentence-${slug}-${bucketTag}${debugTag}-${stamp}.mp4`);
-		onLog(`Concatenating -> ${outFile}`);
-
-		const inputArgs: string[] = [];
-		for (const p of clipPaths) inputArgs.push('-i', p);
-		const labels = clipPaths.map((_, i) => `[${i}:v:0][${i}:a:0]`).join('');
-		const filterScript = `${labels}concat=n=${clipPaths.length}:v=1:a=1[outv][outa]`;
-		const filterFile = join(workDir, 'concat-filter.txt');
-		await writeFile(filterFile, filterScript);
-
-		await runFfmpeg(
-			[
-				...inputArgs,
-				'-/filter_complex',
-				filterFile,
-				'-map',
-				'[outv]',
-				'-map',
-				'[outa]',
-				'-c:v',
-				'libx264',
-				'-preset',
-				'veryfast',
-				'-crf',
-				'20',
-				'-pix_fmt',
-				'yuv420p',
-				'-r',
-				'30',
-				'-fps_mode',
-				'cfr',
-				'-c:a',
-				'aac',
-				'-ar',
-				'48000',
-				'-ac',
-				'2',
-				'-b:a',
-				'192k',
-				'-movflags',
-				'+faststart',
-				outFile,
-			],
-			onLog,
-			signal,
-		);
-
-		onLog(`Done: ${outFile}`);
+		const renderArgs = ['render', '--film', filmFile];
+		if (opts.draft) renderArgs.push('--draft');
+		onLog(opts.draft ? 'Rendering draft...' : 'Rendering sentence...');
+		const render = await runEngine(renderArgs, onLog, opts.signal);
+		const qa = opts.draft ? null : await runQa(filmName, film, onLog, opts.signal);
 		return {
-			outFile: resolvePath(outFile),
-			picks: picks.map((p) => ({
-				token: p.token,
-				matchedAs: p.matchedAs,
-				word: p.hit.word,
-				video: basename(p.hit.video),
-			})),
-			missing,
+			status: 'rendered',
+			check,
+			outFile: outputPath(render, 'outFile'),
+			plan: outputPath(render, 'plan'),
+			qa,
 		};
 	} finally {
-		await rm(workDir, { recursive: true, force: true });
+		await rm(tempDir, { recursive: true, force: true });
 	}
 }

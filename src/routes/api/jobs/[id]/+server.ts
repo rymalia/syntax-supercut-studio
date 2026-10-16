@@ -28,7 +28,7 @@ export const GET: RequestHandler = async ({ params }) => {
 		if (loc) {
 			const filename = basename(abs);
 			mediaUrl = `/api/media/${encodeURIComponent(loc.bucket)}/${loc.kind}/${encodeURIComponent(filename)}`;
-		} else if (job.kind === 'film-render') {
+		} else if (job.kind === 'film-render' || job.kind === 'sentence') {
 			const rel = engineMediaPath(abs);
 			if (rel?.startsWith('films/out/')) mediaUrl = `/api/engine-media/${rel.split('/').map(encodeURIComponent).join('/')}`;
 		}

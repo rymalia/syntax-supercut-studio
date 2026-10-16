@@ -2,10 +2,11 @@ import { json } from '@sveltejs/kit';
 import { readdir, readFile } from 'node:fs/promises';
 import type { RequestHandler } from './$types';
 import { filmPath, filmsDir } from '$lib/server/engine';
+import { SENTENCE_FILM_NAME } from '$lib/server/pipelines/sentence';
 
 export const GET: RequestHandler = async () => {
 	const names = await readdir(filmsDir()).catch(() => []);
-	const films = (await Promise.all(names.filter((name) => /^[a-z0-9_-]+\.json$/.test(name)).map(async (name) => {
+	const films = (await Promise.all(names.filter((name) => /^[a-z0-9_-]+\.json$/.test(name) && !SENTENCE_FILM_NAME.test(name.slice(0, -5))).map(async (name) => {
 		const slug = name.slice(0, -5);
 		try {
 			const film = JSON.parse(await readFile(filmPath(slug), 'utf8'));

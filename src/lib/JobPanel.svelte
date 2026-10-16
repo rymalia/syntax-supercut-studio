@@ -10,6 +10,14 @@
 		finishedAt: number | null;
 	}
 
+	interface SentenceResult {
+		status?: string;
+		check?: {
+			lines?: { why?: string }[];
+			film?: { why?: string };
+		};
+	}
+
 	function formatDuration(sec: number): string {
 		if (!Number.isFinite(sec) || sec <= 0) return '0s';
 		const m = Math.floor(sec / 60);
@@ -112,7 +120,23 @@
 		</div>
 	</div>
 
-	{#if jobState.job.status === 'done' && jobState.job.result?.dryRun}
+	{#if jobState.job.status === 'done' && jobState.job.kind === 'sentence' && jobState.job.result?.status === 'cannot-build'}
+		{@const r = jobState.job.result as SentenceResult}
+		{@const lineWhy = r.check?.lines?.[0]?.why}
+		{@const filmWhy = r.check?.film?.why}
+		<div role="status" style="padding: 1.25rem; border: 2px solid var(--ink);">
+			<strong class="caps">Cannot build sentence</strong>
+			<!-- The engine's reasons are one line per word; a one-line film repeats the line's reason. -->
+			{#if lineWhy}<p style="margin-block-start: 0.75rem; white-space: pre-wrap; font-family: var(--font-mono); font-size: var(--fs-small);">{lineWhy}</p>{/if}
+			{#if filmWhy && filmWhy !== lineWhy}<p style="margin-block-start: 0.5rem; white-space: pre-wrap; font-family: var(--font-mono); font-size: var(--fs-small);">{filmWhy}</p>{/if}
+			{#if !lineWhy && !filmWhy}<p style="margin-block-start: 0.75rem;">The engine could not find a buildable take.</p>{/if}
+			<ul style="margin-block: 1rem 0; padding-inline-start: 1.25rem;">
+				<li>Try splitting this into shorter sentences.</li>
+				<li>Try another person/group.</li>
+				<li>Clear cast restriction and let the engine choose.</li>
+			</ul>
+		</div>
+	{:else if jobState.job.status === 'done' && jobState.job.result?.dryRun}
 		{@const r = jobState.job.result as {
 			totalHits?: number;
 			segments?: number;

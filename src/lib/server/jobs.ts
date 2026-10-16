@@ -6,7 +6,7 @@ import { listBuckets, resolveBuckets } from './paths.js';
 import { generateMissingThumbs } from './thumbs.js';
 import { filmPath, runEngine, type EngineResult } from './engine.js';
 import { buildSupercut, type SupercutOptions, type SupercutResult } from './pipelines/supercut.js';
-import { buildSentence, type SentenceOptions, type SentenceResult } from './pipelines/sentence.js';
+import { buildSentence, type SentenceParams, type SentenceResult } from './pipelines/sentence.js';
 import { buildSong, type SongifyOptions, type SongifyResult } from './pipelines/songify.js';
 import {
 	transcribeOne,
@@ -35,7 +35,7 @@ export interface JobBase<Kind extends JobKind, Params, Result> {
 
 export type Job =
 	| JobBase<'supercut', SerializableSupercutParams, SupercutResult>
-	| JobBase<'sentence', SentenceOptions, SentenceResult>
+	| JobBase<'sentence', SentenceParams, SentenceResult>
 	| JobBase<'songify', SongifyOptions, SongifyResult>
 	| JobBase<'transcribe-one', TranscribeOneOptions, TranscribeOneResult>
 	| JobBase<'transcribe-all', TranscribeAllMissingOptions, TranscribeAllMissingResult>
@@ -106,7 +106,10 @@ function activityResult(status: 'done' | 'cancelled' | 'error', result: unknown,
 	const outFile = result && typeof result === 'object' && typeof (result as { outFile?: unknown }).outFile === 'string'
 		? basename((result as { outFile: string }).outFile)
 		: '';
-	return outFile ? `done: ${outFile}` : 'done';
+	const r = (result ?? {}) as { status?: unknown; qa?: { ok?: unknown } | null };
+	if (r.status === 'cannot-build') return 'cannot build';
+	const qaNote = r.qa && r.qa.ok === false ? ' (qa failed)' : '';
+	return outFile ? `done: ${outFile}${qaNote}` : `done${qaNote}`;
 }
 
 export function getJob(id: string): Job | undefined {
@@ -199,8 +202,8 @@ export function startSupercut(params: SerializableSupercutParams): Job {
 	return job;
 }
 
-export function startSentence(params: SentenceOptions): Job {
-	const job = baseJob<'sentence', SentenceOptions, SentenceResult>('sentence', params);
+export function startSentence(params: SentenceParams): Job {
+	const job = baseJob<'sentence', SentenceParams, SentenceResult>('sentence', params);
 	runInBackground(job, (onLog, signal) => buildSentence({ ...params, onLog, signal }));
 	return job;
 }

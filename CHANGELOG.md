@@ -27,6 +27,12 @@ Changes are not sent upstream. Newest first; group entries by date.
   `talking-heads-videos` appear in the Library without a server restart.
   Corpus: 179 clips, 192k words.
 
+### Changed
+- **Sentence mashups use the talking-heads engine.** `/sentence` now builds one
+  coherent monologue line with optional cast restrictions, captions, and draft
+  renders. The old per-word stitching controls and legacy pipeline were removed;
+  unbuildable sentences report the engine's diagnostics with suggestions.
+
 ### Fixed
 - **Cancelling an engine job stops all of its work.** Cancel, and stopping the dev
   server, now signal the engine's whole process group (SIGTERM, then SIGKILL after

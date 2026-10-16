@@ -22,6 +22,24 @@ function asStringArray(value: unknown): string[] | null {
 	return out.length ? out : null;
 }
 
+function asOptionalBoolean(value: unknown, name: string): boolean | undefined {
+	if (value === undefined) return undefined;
+	if (typeof value !== 'boolean') throw error(400, `${name} must be a boolean`);
+	return value;
+}
+
+function asOptionalCast(value: unknown): string[] | null | undefined {
+	if (value === undefined) return undefined;
+	if (value === null) return null;
+	if (!Array.isArray(value)) throw error(400, 'cast must be an array of person or group names');
+	const cast: string[] = [];
+	for (const item of value) {
+		if (typeof item !== 'string' || !item.trim()) throw error(400, 'cast must contain non-empty strings');
+		cast.push(item.trim());
+	}
+	return cast.length ? cast : null;
+}
+
 export const GET: RequestHandler = async () => {
 	return json({ jobs: listJobs() });
 };
@@ -70,13 +88,15 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ id: job.id });
 		}
 		case 'sentence': {
-			const { sentence, seed, debug } = body as Record<string, unknown>;
+			const { sentence, cast, captions, speakerLabels, draft } = body as Record<string, unknown>;
 			if (typeof sentence !== 'string' || !sentence.trim()) throw error(400, 'sentence required');
+			const sentenceCast = asOptionalCast(cast);
 			const job = startSentence({
-				sentence,
-				seed: typeof seed === 'number' ? seed : undefined,
-				buckets,
-				debug: Boolean(debug),
+				sentence: sentence.trim(),
+				cast: sentenceCast,
+				captions: asOptionalBoolean(captions, 'captions'),
+				speakerLabels: asOptionalBoolean(speakerLabels, 'speakerLabels'),
+				draft: asOptionalBoolean(draft, 'draft'),
 			});
 			return json({ id: job.id });
 		}
