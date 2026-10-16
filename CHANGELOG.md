@@ -12,6 +12,15 @@ git diff --stat upstream-baseline
 
 Changes are not sent upstream. Newest first; group entries by date.
 
+## 2026-10-16
+
+### Added
+- **Ingest tooling in the engine snapshot.** `engine/ingest_all.sh` runs the whole
+  incremental ingest (ASR, faces, ASD, identities, phrase bank) and refreshes the
+  app buckets with the new `engine/build_buckets.py`; new sources in
+  `talking-heads-videos` appear in the Library without a server restart.
+  Corpus: 179 clips, 192k words.
+
 ## 2026-10-15
 
 ### Added

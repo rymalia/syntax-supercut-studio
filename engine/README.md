@@ -15,7 +15,9 @@ calls `engine_cli.py` in the live directory.
 | `asd_run.py` | active-speaker scoring per face track (runs on MPS) |
 | `identities.py` | facenet embeddings per track, split at shot changes, clustered per clip → castable people |
 | `phrasebank.py` | per-person inventory of on-camera phrase runs; `--grep` |
+| `ingest_all.sh` | one-command incremental ingest: `ingest_new.sh` → `identities.py` (new ids) → `phrasebank.py` → `build_buckets.py` |
 | `ingest_new.sh`, `build2.sh` | incremental ingest of new source clips; ear-check → render → QA for a film |
+| `build_buckets.py` | writes the app's `talking-heads` (all words) and `talking-heads-onscreen` (on-screen words, `\|` gap tokens) buckets from `words/`; idempotent |
 | `people.json`, `clipcrop.json` | named groups of person ids; per-clip pane rules (split-screen sources) |
 | `faces.swift` | Apple Vision face/landmark pass (compiled to `faces_bin`) |
 
