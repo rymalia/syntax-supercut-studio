@@ -48,12 +48,26 @@ export async function logActivity(action: string, target: string, result: string
 	}
 }
 
+// The ISO-8601 shape `Date.toISOString()` and Python's `isoformat()` produce; the
+// round-trip check rejects dates that Date.parse would roll over, like Feb 30.
+const ISO_TS = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+function isIsoTimestamp(ts: string): boolean {
+	const m = ISO_TS.exec(ts);
+	if (!m) return false;
+	const ms = Date.parse(ts);
+	if (Number.isNaN(ms)) return false;
+	const [y, mo, d] = m[1].split('-').map(Number);
+	const day = new Date(Date.UTC(y, mo - 1, d));
+	return day.getUTCFullYear() === y && day.getUTCMonth() === mo - 1 && day.getUTCDate() === d;
+}
+
 function isActivityEntry(value: unknown): value is ActivityEntry {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
 	const entry = value as Record<string, unknown>;
 	return (
 		typeof entry.ts === 'string' &&
-		!Number.isNaN(Date.parse(entry.ts)) &&
+		isIsoTimestamp(entry.ts) &&
 		(entry.actor === 'app' || entry.actor === 'desktop' || entry.actor === 'code') &&
 		typeof entry.action === 'string' &&
 		typeof entry.target === 'string' &&

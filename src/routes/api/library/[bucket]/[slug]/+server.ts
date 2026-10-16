@@ -3,6 +3,7 @@ import { readdir, unlink } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import type { RequestHandler } from './$types';
 import { resolveBuckets } from '$lib/server/paths';
+import { logActivity } from '$lib/server/activity';
 
 /**
  * Delete every file associated with a single library slug inside a bucket:
@@ -37,8 +38,12 @@ export const DELETE: RequestHandler = async ({ params }) => {
 		for (const f of await readdir(bucket.videosDir)) {
 			if (basename(f, extname(f)) !== slug) continue;
 			const full = join(bucket.videosDir, f);
-			await unlink(full).catch(() => {});
-			deleted.push(`videos/${f}`);
+			try {
+				await unlink(full);
+				deleted.push(`videos/${f}`);
+			} catch {
+				// Report only files that were actually removed.
+			}
 		}
 	} catch {
 		// videos dir may not exist yet
@@ -54,6 +59,8 @@ export const DELETE: RequestHandler = async ({ params }) => {
 	}
 
 	if (deleted.length === 0) throw error(404, 'Nothing to delete');
+
+	void logActivity('library:delete', `${bucket.name}/${slug}`, deleted.join(', '));
 
 	return json({ ok: true, deleted });
 };

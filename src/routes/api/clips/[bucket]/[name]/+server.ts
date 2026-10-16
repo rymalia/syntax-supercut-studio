@@ -3,6 +3,7 @@ import { unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { RequestHandler } from './$types';
 import { resolveBuckets, isInsideAllowedRoot } from '$lib/server/paths';
+import { logActivity } from '$lib/server/activity';
 
 export const DELETE: RequestHandler = async ({ params }) => {
 	const bucketName = decodeURIComponent(params.bucket);
@@ -18,5 +19,6 @@ export const DELETE: RequestHandler = async ({ params }) => {
 	await unlink(full).catch((err) => {
 		throw error(404, err.message);
 	});
+	void logActivity('clip:delete', `${bucket.name}/${name}`, 'deleted');
 	return json({ ok: true });
 };

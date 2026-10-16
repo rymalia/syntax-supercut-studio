@@ -53,6 +53,6 @@ Transcripts for the engine's clips are mirrored into the buckets `talking-heads`
 ## Activity log
 
 The shared append-only activity log is `<TH_ENGINE_DIR>/activity.jsonl`. Each write is one JSON object on one line:
-`{"ts":"<ISO-8601>","actor":"app|desktop|code","action":"...","target":"...","result":"..."}`.
+`{"ts":"<ISO-8601 with Z or offset>","actor":"app|desktop|code","action":"...","target":"...","result":"..."}`.
 The app writes `actor: "app"`; `engine_cli.py` may append `actor: "desktop"` lines, and other code may use `actor: "code"`.
 Writers append without rewriting the file, and readers skip malformed lines.
