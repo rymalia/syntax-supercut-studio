@@ -6,7 +6,7 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 
 | ID | Task | Owner | Status | Blocked by | Notes |
 | --- | --- | --- | --- | --- | --- |
-| B1 | `/people` "name this cluster" writes `people.json` | code | todo | | format in inbox/code.md |
+| B1 | `/people` "name this cluster" writes `people.json` | code | done | | `POST /api/engine/people/names {version, ids, name}` (name null = remove); `GET /api/engine/people` adds `names_version`; 409 on stale version |
 | B2 | Stable cluster ids in `identities.py` | desktop | todo | | re-run all 179 clips (~1 h GPU) |
 | B3 | `engine_cli.py ingest --dry-run` (lists new sources, no work) | desktop | todo | | |
 | B4 | "Check for new sources" button + count on `/ingest` | code | todo | B3 | |
