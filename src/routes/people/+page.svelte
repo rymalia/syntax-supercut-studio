@@ -10,6 +10,10 @@
 	let nameInput = $state('');
 	let saving = $state(false);
 	let message = $state('');
+	let hideNamed = $state(false);
+	let namedIds = $derived(new Set(Object.values(names).flat()));
+	let unnamed = $derived(people.filter((person) => !namedIds.has(person.id)));
+	let shown = $derived(hideNamed ? unnamed : people);
 	let normalized = $derived(nameInput.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''));
 
 	async function load() {
@@ -21,7 +25,18 @@
 		version = data.names_version ?? '';
 	}
 	onMount(async () => {
+		try { hideNamed = localStorage.getItem('people.hideNamed') === '1'; } catch { /* storage blocked */ }
 		try { await load(); } catch (err) { failure = String(err); }
+	});
+
+	function setHideNamed(hide: boolean) {
+		hideNamed = hide;
+		try { localStorage.setItem('people.hideNamed', hide ? '1' : '0'); } catch { /* storage blocked */ }
+	}
+	// Never leave hidden clusters ticked, where a save would rename them unseen
+	// (turning the toggle on, or a 409 reload naming a ticked cluster).
+	$effect(() => {
+		if (hideNamed) for (const id of [...selected]) if (namedIds.has(id)) selected.delete(id);
 	});
 
 	function toggle(id: string) {
@@ -29,6 +44,8 @@
 		else selected.add(id);
 	}
 	function selectGroup(name: string) {
+		// The group's tiles are named, so show them rather than select them unseen.
+		if (hideNamed) setHideNamed(false);
 		selected.clear();
 		for (const id of names[name] ?? []) selected.add(id);
 		nameInput = name;
@@ -88,7 +105,8 @@
 		</form>
 		{#if message}<p role="status" class="muted">{message}</p>{/if}
 	</section>
-	<PersonGrid {people} {names} readOnly {selected} onToggle={toggle} onGroup={selectGroup} />
+	<label class="hide-named"><input type="checkbox" checked={hideNamed} onchange={(event) => setHideNamed(event.currentTarget.checked)} /> Hide named clusters <span class="muted">({unnamed.length} of {people.length} unnamed)</span></label>
+	<PersonGrid people={shown} {names} readOnly {selected} onToggle={toggle} onGroup={selectGroup} />
 {/if}
 
 <style>
@@ -96,4 +114,5 @@
 	.naming form { align-items: end; }
 	.naming-input { flex: 1 1 16rem; }
 	.naming-input label { margin: 0; }
+	.hide-named { display: flex; gap: 0.4rem; align-items: center; margin-block-end: 1rem; cursor: pointer; }
 </style>

@@ -15,6 +15,11 @@ Changes are not sent upstream. Newest first; group entries by date.
 ## 2026-10-16
 
 ### Added
+- **People: hide named clusters, search by name.** `/people` has a "Hide named
+  clusters" toggle (remembered per browser) that leaves only the clusters still to
+  identify, with an unnamed count. People search on `/people` and `/film` also
+  matches a cluster's name, with `_` matching a space (`billy_boy` is found by
+  "billy", "boy" or "billy boy").
 - **Ingest tooling in the engine snapshot.** `engine/ingest_all.sh` runs the whole
   incremental ingest (ASR, faces, ASD, identities, phrase bank) and refreshes the
   app buckets with the new `engine/build_buckets.py`; new sources in
@@ -25,6 +30,9 @@ Changes are not sent upstream. Newest first; group entries by date.
 - **Cancelling an engine job stops all of its work.** Cancel, and stopping the dev
   server, now signal the engine's whole process group (SIGTERM, then SIGKILL after
   10 s), so `ingest_new.sh`, ffmpeg and ASD workers no longer keep running.
+- **Activity log:** Library and clip deletes are now logged; malformed timestamps
+  (non-ISO, impossible dates, no timezone) are skipped. A Library delete now lists
+  only files that were actually removed.
 
 ## 2026-10-15
 

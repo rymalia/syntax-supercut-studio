@@ -15,8 +15,12 @@
 	} = $props();
 	let nameOf = $derived(new Map(Object.entries(names).flatMap(([name, ids]) => ids.map((id) => [id, name] as const))));
 	let search = $state('');
-	let matches = $derived(people.filter((person) => `${person.id} ${person.clip_name} ${person.clip}`.toLowerCase().includes(search.toLowerCase())));
-	let groups = $derived(Object.entries(names).filter(([name]) => name.toLowerCase().includes(search.toLowerCase())));
+	// A name like billy_boy also matches "billy boy".
+	let matches = $derived(people.filter((person) => {
+		const name = nameOf.get(person.id) ?? '';
+		return `${person.id} ${person.clip_name} ${person.clip} ${name} ${name.replaceAll('_', ' ')}`.toLowerCase().includes(search.toLowerCase());
+	}));
+	let groups = $derived(Object.entries(names).filter(([name]) => `${name} ${name.replaceAll('_', ' ')}`.toLowerCase().includes(search.toLowerCase())));
 	function choose(id: string) {
 		if (readOnly) goto(`/film?person=${encodeURIComponent(id)}`);
 		else onSelect?.(id);

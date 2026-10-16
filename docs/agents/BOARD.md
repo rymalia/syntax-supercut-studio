@@ -27,4 +27,4 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 | B19 | Remote Control test for live agent messaging | ryan | todo | | 5 min |
 | B20 | `-hwaccel videotoolbox` decode for thumbnail strips, then raise strip concurrency | code | todo | | most sources are AV1; M4 Max decodes AV1 in hardware |
 | B21 | Cancelling an ingest/render kills the whole engine process tree (app: own process group + group kill; engine: forward SIGTERM in `stream()`) | code+desktop | app half done | | app: detached spawn, group SIGTERM, SIGKILL at 10 s, shutdown hook (`1c213b6`); engine half (forward SIGTERM in `stream()`) open; found by Codex review 2026-10-15; today `ingest_new.sh`, ffmpeg and ASD workers keep running after cancel |
-| B22 | `/people` toggle to hide clusters that already have a name, to narrow down the ones left to identify | code | todo | | requested by ryan 2026-10-16 |
+| B22 | `/people` toggle to hide clusters that already have a name, to narrow down the ones left to identify | code | done | | requested by ryan 2026-10-16; toggle remembered in localStorage, unticks hidden clusters; people search also matches names (`_` = space) |
