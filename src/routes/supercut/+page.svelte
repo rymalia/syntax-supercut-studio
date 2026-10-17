@@ -1,6 +1,7 @@
 <script lang="ts">
 	import JobPanel from '$lib/JobPanel.svelte';
 	import BucketPicker from '$lib/BucketPicker.svelte';
+	import RegexTips from '$lib/RegexTips.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 
@@ -148,6 +149,9 @@
 					word it touches, even partly: <code>\bit\b</code> also hits
 					<code>it's</code> (use <code>\bit\b(?!')</code> to skip it). The
 					<code>g</code> and <code>i</code> flags are added automatically.
+				</div>
+				<div>
+					<RegexTips onUse={(pattern) => (regexSource = pattern)} />
 				</div>
 			</div>
 		{:else}

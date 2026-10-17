@@ -14,6 +14,13 @@ Changes are not sent upstream. Newest first; group entries by date.
 
 ## 2026-10-17
 
+### Added
+- **Regex tips on `/supercut`.** A "Regex tips" button in regex mode opens a
+  modal of examples for this corpus: why words go in `\b` and options in
+  parentheses, optional pieces, contractions, punctuation, what a match pulls
+  into the clip, and how to allow words in between without `.*` producing
+  hours-long clips. Each example has a "Use" button that fills the regex field.
+
 ### Fixed
 - **Smart-quote apostrophes in supercut search.** A curly `’` typed into
   `/supercut` (phrase or regex) or `/songify` used to match nothing, because
