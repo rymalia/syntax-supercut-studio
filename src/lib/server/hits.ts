@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { VIDEO_EXTS, resolveBuckets, type Bucket } from './paths.js';
-import { normalize, type Hit, type Transcript } from './text.js';
+import { foldApostrophes, normalize, type Hit, type Transcript } from './text.js';
 
 const PAD_BEFORE = 0;
 const PAD_AFTER = 0;
@@ -43,7 +43,9 @@ export interface CollectHitsOptions {
  * bucket-aware filenames.
  */
 export async function collectHits(opts: CollectHitsOptions): Promise<Hit[]> {
-	const regex = opts.regex ?? null;
+	// Rebuilt with straight apostrophes so a smart-quoted `don’t` matches; the
+	// joined transcript text is folded the same way below.
+	const regex = opts.regex ? new RegExp(foldApostrophes(opts.regex.source), opts.regex.flags) : null;
 	const target = opts.target ?? '';
 	const onLog = opts.onLog ?? (() => {});
 
@@ -92,7 +94,7 @@ export async function collectHits(opts: CollectHitsOptions): Promise<Hit[]> {
 						parts.push(' ');
 						pos += 1;
 					}
-					const t = words[i].text;
+					const t = foldApostrophes(words[i].text);
 					wordStart.push(pos);
 					parts.push(t);
 					pos += t.length;

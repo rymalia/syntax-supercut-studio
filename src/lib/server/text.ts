@@ -1,5 +1,15 @@
+/**
+ * Turns curly and modifier apostrophes into a straight `'`, so input typed with
+ * smart punctuation matches transcripts. Each character maps to one UTF-16 unit,
+ * so string offsets are unchanged.
+ */
+export function foldApostrophes(text: string): string {
+	return text.replace(/[\u2018\u2019\u02BC]/g, "'");
+}
+
+/** Lowercases and strips punctuation, keeping apostrophes: `don't` and `dont` differ. */
 export function normalize(word: string): string {
-	return word.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '');
+	return foldApostrophes(word.toLowerCase()).replace(/[^\p{L}\p{N}']/gu, '');
 }
 
 export function slugify(phrase: string): string {

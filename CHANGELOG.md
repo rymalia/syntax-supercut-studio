@@ -12,6 +12,16 @@ git diff --stat upstream-baseline
 
 Changes are not sent upstream. Newest first; group entries by date.
 
+## 2026-10-17
+
+### Fixed
+- **Smart-quote apostrophes in supercut search.** A curly `’` typed into
+  `/supercut` (phrase or regex) or `/songify` used to match nothing, because
+  transcripts use a straight `'`. Curly and modifier apostrophes now count as
+  `'`. The phrase and regex help text now says what punctuation actually
+  does: phrase mode ignores punctuation except apostrophes (`don't` ≠ `dont`),
+  and a regex match clips every word it touches, even partly.
+
 ## 2026-10-16
 
 ### Added

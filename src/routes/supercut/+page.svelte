@@ -125,8 +125,10 @@
 				<label for="target">Word or phrase</label>
 				<input id="target" type="text" placeholder="e.g. yeah" bind:value={target} required />
 				<div class="help">
-					Matches every occurrence across all transcripts. Case- and
-					punctuation-insensitive. Multi-word phrases supported.
+					Matches every occurrence across all transcripts. Ignores case and
+					punctuation, except apostrophes: <code>don't</code> won't match
+					<code>dont</code>. Hyphenated words count as one word
+					(<code>mm-hmm</code>). Multi-word phrases supported.
 				</div>
 			</div>
 		{:else if mode === 'regex'}
@@ -140,7 +142,11 @@
 					required
 				/>
 				<div class="help">
-					Runs against the full joined transcript (punctuation preserved). The
+					Runs against the transcript text with words joined by single spaces.
+					Punctuation stays attached to its word (<code>know,</code>), so
+					<code>you know</code> misses <code>you, know</code>. A match clips every
+					word it touches, even partly: <code>\bit\b</code> also hits
+					<code>it's</code> (use <code>\bit\b(?!')</code> to skip it). The
 					<code>g</code> and <code>i</code> flags are added automatically.
 				</div>
 			</div>
