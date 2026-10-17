@@ -17,6 +17,9 @@
 		{ pattern: '\\b(um|uh)\\b', finds: 'filler sounds' },
 		{ pattern: '\\b(like|kind of|sort of)\\b', finds: 'options can be several words long' },
 	];
+	const alternativesFixed: Example[] = [
+		{ pattern: '\\byour (mom|mam)\\b', finds: '"your mom" or "your mam", and nothing else' },
+	];
 	const optional: Example[] = [
 		{ pattern: '\\b(i|we) loved?\\b', finds: 'I love, I loved, we love, we loved' },
 		{ pattern: '\\b(so )?crazy\\b', finds: '"crazy" and "so crazy" (the clip includes "so" when it\'s there)' },
@@ -112,6 +115,14 @@
 				Without parentheses, <code>\bno|yes\b</code> means <code>\bno</code> or <code>yes\b</code>,
 				so it still matches the start of "nothing" and "nobody": 5,098 hits instead of 2,021.
 			</p>
+			<p class="tip-warn">
+				A <code>|</code> splits everything around it, not just the nearest words.
+				<code>\byour mom|mam</code> means <code>\byour mom</code> or <code>mam</code>: the first
+				half has no end edge, so it can clip "your moment", and the second matches "mam" inside
+				any word, like mama and umami. In the talking-heads bucket it gets 45 hits, and only 16
+				are "your mom". Parentheses keep the "or" to the last word:
+			</p>
+			{@render examples(alternativesFixed)}
 		</section>
 
 		<section>
