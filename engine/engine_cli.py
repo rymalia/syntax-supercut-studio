@@ -20,7 +20,7 @@ Commands
                                  then rebuild the word bank, identities and phrase bank (long; streams LOG lines)
   stats                          phrase-bank index: people ranked by admissible on-screen words
 """
-import json, os, sys, subprocess, argparse, traceback
+import json, os, re, sys, subprocess, argparse, traceback
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 PY = os.path.join(HERE, "asd", ".venv", "bin", "python")
 FF = "/opt/homebrew/bin/ffmpeg"
@@ -195,6 +195,20 @@ def cmd_stats(a):
             rows.append({"person": pid, "words": int(c[1]), "runs4": int(c[2]), "longest": int(c[3]), "clip_name": c[4]})
     result({"ok": True, "people": rows})
 
+def cmd_export(a):
+    """cut list (app supercut sidecar) or an engine plan -> FCPXML (+ SRT) referencing the original sources"""
+    import export_cuts as X
+    if a.plan:
+        if not re.fullmatch(r"[a-z0-9_-]+", a.plan): fail("bad plan name")
+        if not os.path.exists(os.path.join(HERE, "films", "out", a.plan + ".plan.json")): fail(f"no plan for {a.plan}")
+        log(f"export: plan {a.plan}"); cl = X.from_plan(a.plan)
+    else:
+        log(f"export: cut list {a.cuts}"); cl = json.load(open(a.cuts))
+    out = a.out or os.path.join(HERE, "films", "out")
+    r = X.build(cl, out)
+    log(f"export: {r['clips']} items from {r['sources']} sources at {r['fps']} fps -> {r['fcpxml']}")
+    result({"ok": True, **r})
+
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("people"); sub.add_parser("stats"); sub.add_parser("ingest")
@@ -203,6 +217,8 @@ def main():
         s = sub.add_parser(n); s.add_argument("--film", required=True)
         if n == "plan": s.add_argument("--sheet", action="store_true")
         if n == "render": s.add_argument("--draft", action="store_true")
+    e = sub.add_parser("export"); eg = e.add_mutually_exclusive_group(required=True)
+    eg.add_argument("--plan"); eg.add_argument("--cuts"); e.add_argument("--out")
     q = sub.add_parser("qa"); q.add_argument("--name", required=True); q.add_argument("--no-sheet", action="store_true")
     a = ap.parse_args()
     try:

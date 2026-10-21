@@ -26,6 +26,7 @@ Long commands (`render`, `ingest`, `qa`) must honour the job `AbortSignal`: kill
 | `render --film <path> [--draft]` | | `{name, outFile, plan, snippets, lines, takes_per_line, persons}` — `outFile` is the absolute mp4 path under `<TH_ENGINE_DIR>/films/out/`. LOG lines `progress i/n ...` while snippets render. |
 | `qa --name <name> [--no-sheet]` | after render | the QA record: `{name, cold, heard, total, ghosts, gate, missed, line_match, line_total, report: [..], acoustic: {...}, sheets: [paths]}`. |
 | `ingest` | — | `{clips, new_identities, buckets, review_batch}` where `buckets` is whether the Library bucket refresh succeeded and `review_batch` is the successful `<first>-<last>` speaker-review batch or `null` — long (minutes to an hour); streams LOG. Processes any media in `~/Downloads/talking-heads-videos` not yet in `clips.tsv`, then refreshes buckets and builds a review batch for clips added in this run (both post-ingest steps are tolerated if they fail). |
+| `export (--plan <name> \| --cuts <path>) [--out <dir>]` | an engine render's `films/out/<name>.plan.json`, or a cut list (below) | `{fcpxml, srt?, fps, frames, clips, sources}`: absolute paths of an FCPXML 1.10 timeline that references the **original source files** (for DaVinci Resolve's File › Import › Timeline, or Final Cut) and an `.srt` of the captions when there are any. `--out` defaults to `films/out/`. With `--plan` the converted cut list is also written as `<out>/<name>.cuts.json`. |
 | `stats` | — | `{people: [{person, words, runs4, longest, clip_name}]}` ranked by admissible on-screen words. |
 
 ## Film JSON (what the `/film` editor saves to `<TH_ENGINE_DIR>/films/<slug>.json`)
@@ -56,3 +57,44 @@ The shared append-only activity log is `<TH_ENGINE_DIR>/activity.jsonl`. Each wr
 `{"ts":"<ISO-8601 with Z or offset>","actor":"app|desktop|code","action":"...","target":"...","result":"..."}`.
 The app writes `actor: "app"`; `engine_cli.py` may append `actor: "desktop"` lines, and other code may use `actor: "code"`.
 Writers append without rewriting the file, and readers skip malformed lines.
+
+## Cut list v1 (edit decisions for `export`)
+
+What an edit is made of, so it can be rebuilt in an editor from the sources. The app's supercut writes one per render as
+`<render>.cuts.json` beside the mp4; the engine derives one from a plan. Times are seconds, paths absolute (resolve
+bucket symlinks to their targets), the order of `clips` doesn't matter.
+
+```json
+{"version": 1, "name": "i-dont-know-supercut-talking-heads-20261021-153000", "origin": "supercut",
+ "fps": null, "width": 1920, "height": 1080,
+ "clips": [
+   {"media": "av", "track": 1, "rec": 0.0, "src": "/Users/rymalia/Downloads/talking-heads-videos/....mp4",
+    "in": 12.30, "out": 12.94, "speed": 1.0, "rect": null, "crop": null,
+    "gain_db": 0, "fade_in": 0, "fade_out": 0, "freeze": 0, "clip": "c04", "name": "I don't know"}],
+ "captions": [{"start": 0.0, "end": 0.64, "text": "I don't know"}],
+ "markers": [{"t": 0.0, "name": "hit 1/103", "note": "c04 12.30"}]}
+```
+
+- `media`: `av` (picture + its own audio), `v` (picture only), `a` (audio only). `track`: V1/A1 = 1. V1 is the main storyline;
+  every other item is attached to the V1 item (or gap) under its start.
+- `rec`: timeline position. `in`/`out`: source range. `speed`: 1.25 plays 1.25 s of source per second; the item lasts
+  `(out-in)/speed + freeze`. `freeze`: seconds of held last frame.
+- `rect` `[x,y,w,h]`: where the picture sits, as fractions of the frame; the source window is fitted inside (tiles).
+  `crop` `[x,y,w,h]`: the source window, as fractions of the source (push-in, split-screen pane). Both null = full frame, fit.
+- `gain_db`, `fade_in`, `fade_out`: audio. `fps` null = the most-used source rate (duration-weighted); else `"23.976"`, `"25"`,
+  `"29.97"`, `"30"`, ... .
+- The exporter snaps to frames: source in floors to a source frame, durations ceil to a timeline frame (no clipped words).
+
+How it lands in DaVinci Resolve 21 (free), verified 2026-10-21 by importing into a scratch project and reading every item
+back through the scripting API plus stills compared with the engine's render:
+- Source ranges are frame-exact; VP9 and AV1 sources import (no transcode); paths with `'` and full-width `｜` relink.
+- Picture is on V2 upward (V1 stays empty: the FCPXML spine is one gap that every item hangs off, the one form Resolve and
+  FCP read the same way). Audio: A1 = dialogue, then music.
+- Zoom/pan/crop (push-in, tiles) match the engine's framing; per-take gain lands as AudioVolume; speed changes and freezes
+  (a freeze = the last frame at 2% speed) are exact. Captions come as an `.srt` for File › Import › Subtitle.
+- Resolve ignores `srcEnable`, honours a `timeMap` only on `asset-clip`, and reads a `<video>` child's offset as absolute, so
+  the emitter uses asset-clips everywhere (picture-only via a `hasAudio="0"` twin asset) and `<audio>` for audio-only.
+
+Supercut mapping: a solo hit = one `av` item at `[hit.start, hit.end]`. A tile of n hits = n `av` items at the same `rec`,
+tracks 1..n, `rect` = the tile cell from `gridFor(n)` (centred like the render's `pad`), `speed` = the render's per-hit
+speed, all lasting the tile duration.
