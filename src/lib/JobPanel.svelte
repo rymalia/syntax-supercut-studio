@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ExportForResolve from '$lib/ExportForResolve.svelte';
+
 	interface JobState {
 		id: string;
 		kind: string;
@@ -55,7 +57,11 @@
 		}
 	}
 
-	type PanelState = { job: JobState | null; mediaUrl: string | null };
+	type PanelState = {
+		job: JobState | null;
+		mediaUrl: string | null;
+		exportTarget?: { bucket: string; file: string } | { plan: string } | null;
+	};
 
 	let jobState: PanelState = $state({ job: null, mediaUrl: null });
 
@@ -226,6 +232,9 @@
 				Open
 			</a>
 		</div>
+		{#if jobState.exportTarget}
+			<ExportForResolve target={jobState.exportTarget} />
+		{/if}
 	{/if}
 
 	<details style="margin-block-start: 1rem;" open={jobState.job.status !== 'done'}>

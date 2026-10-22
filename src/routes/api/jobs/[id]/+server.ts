@@ -1,9 +1,9 @@
 import { json, error } from '@sveltejs/kit';
-import { basename } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import type { RequestHandler } from './$types';
 import { cancelJob, getJob } from '$lib/server/jobs';
 import { bucketForPath } from '$lib/server/paths';
-import { engineMediaPath } from '$lib/server/engine';
+import { engineDir, engineMediaPath } from '$lib/server/engine';
 
 export const DELETE: RequestHandler = async ({ params }) => {
 	const ok = cancelJob(params.id);
@@ -34,5 +34,18 @@ export const GET: RequestHandler = async ({ params }) => {
 		}
 	}
 
-	return json({ job, mediaUrl });
+	// What "Export for Resolve" (POST /api/export) should be given for this job.
+	let exportTarget: { bucket: string; file: string } | { plan: string } | null = null;
+	const result = job.status === 'done' ? (job.result as Record<string, unknown> | null) : null;
+	if (job.kind === 'supercut' && typeof result?.cutsFile === 'string' && typeof result.outFile === 'string') {
+		const loc = bucketForPath(result.outFile);
+		if (loc?.kind === 'supercuts') exportTarget = { bucket: loc.bucket, file: basename(result.outFile) };
+	} else if ((job.kind === 'sentence' || job.kind === 'film-render') && typeof result?.plan === 'string') {
+		const plan = result.plan;
+		if (plan.endsWith('.plan.json') && dirname(plan) === join(engineDir(), 'films', 'out')) {
+			exportTarget = { plan: basename(plan, '.plan.json') };
+		}
+	}
+
+	return json({ job, mediaUrl, exportTarget });
 };

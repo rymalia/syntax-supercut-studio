@@ -1,5 +1,5 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
-import { join, resolve as resolvePath } from 'node:path';
+import { mkdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { basename, extname, join, resolve as resolvePath } from 'node:path';
 import { resolveBuckets } from '../paths.js';
 import { runFfmpeg, atempoChain, throwIfAborted, type LogFn } from '../ffmpeg.js';
 import { slugify, timestampSuffix, type Hit } from '../text.js';
@@ -90,6 +90,14 @@ function gridFor(n: number): { cols: number; rows: number } {
 	return { cols, rows };
 }
 
+/** Per-hit playback speed in a tile: fits each word to the tile duration, clamped. */
+function tileSpeeds(group: Hit[], duration: number): number[] {
+	return group.map((h) => {
+		const wordDur = Math.max(0.05, h.end - h.start);
+		return Math.min(TILE_MAX_SPEEDUP, Math.max(1 / TILE_MAX_SLOWDOWN, wordDur / duration));
+	});
+}
+
 async function renderSingle(
 	hit: Hit,
 	outPath: string,
@@ -145,19 +153,11 @@ async function renderTile(
 	const tileW = Math.floor(CANVAS_W / cols);
 	const tileH = Math.floor(CANVAS_H / rows);
 
-	const durations = group.map((h) => h.end - h.start).sort((a, b) => a - b);
-	const median = durations[Math.floor(durations.length / 2)];
-	const duration = Math.min(TILE_MAX_DURATION, Math.max(TILE_MIN_DURATION, median));
+	const duration = tileDuration(group);
 
 	const inputs: string[] = [];
-	const speeds: number[] = [];
+	const speeds = tileSpeeds(group, duration);
 	for (const h of group) {
-		const wordDur = Math.max(0.05, h.end - h.start);
-		let speed = wordDur / duration;
-		const minSpeed = 1 / TILE_MAX_SLOWDOWN;
-		if (speed < minSpeed) speed = minSpeed;
-		if (speed > TILE_MAX_SPEEDUP) speed = TILE_MAX_SPEEDUP;
-		speeds.push(speed);
 		const preRoll = Math.min(0.25, h.start);
 		inputs.push('-ss', (h.start - preRoll).toFixed(3), '-i', h.video);
 	}
@@ -264,6 +264,8 @@ export interface SupercutOptions {
 
 export interface SupercutResult {
 	outFile: string;
+	/** Cut list v1 beside the mp4 (`<render>.cuts.json`); null on dry runs or if writing failed. */
+	cutsFile?: string | null;
 	totalHits: number;
 	segments: number;
 	tiledSegments: number;
@@ -287,6 +289,77 @@ function estimateTotalDuration(groups: Hit[][]): number {
 		else total += tileDuration(g);
 	}
 	return total;
+}
+
+/**
+ * Cut list v1 (docs/ENGINE_CONTRACT.md) for a render, so the engine's `export`
+ * can rebuild it in an editor from the original sources. A solo hit is one
+ * clip; a tile is one clip per hit at the same `rec`, placed at its cell.
+ */
+async function buildCutList(name: string, groups: Hit[][]): Promise<Record<string, unknown>> {
+	const sources = new Map<string, string>();
+	const source = async (video: string) => {
+		let src = sources.get(video);
+		if (!src) sources.set(video, (src = await realpath(video)));
+		return src;
+	};
+	const clipId = (video: string) => basename(video, extname(video));
+	const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+	const clips: Record<string, unknown>[] = [];
+	const captions: Record<string, unknown>[] = [];
+	const markers: Record<string, unknown>[] = [];
+	let rec = 0;
+	for (let i = 0; i < groups.length; i++) {
+		const g = groups[i];
+		const duration = g.length === 1 ? g[0].end - g[0].start : tileDuration(g);
+		const speeds = g.length === 1 ? [1] : tileSpeeds(g, duration);
+		// Mirror renderTile's xstack layout: equal cells, the grid centred by the final pad.
+		const { cols, rows } = gridFor(g.length);
+		const tileW = Math.floor(CANVAS_W / cols);
+		const tileH = Math.floor(CANVAS_H / rows);
+		const padX = Math.floor((CANVAS_W - cols * tileW) / 2);
+		const padY = Math.floor((CANVAS_H - rows * tileH) / 2);
+		for (let j = 0; j < g.length; j++) {
+			const h = g[j];
+			const col = j % cols;
+			const row = Math.floor(j / cols);
+			clips.push({
+				media: 'av',
+				track: j + 1,
+				rec: r3(rec),
+				src: await source(h.video),
+				in: r3(h.start),
+				// renderTile trims each source at the word's end, so a word clamped at the
+				// slowdown limit ends before the tile does; the cut ends where the render does.
+				out: r3(g.length === 1 ? h.end : Math.min(h.end, h.start + duration * speeds[j])),
+				speed: Number(speeds[j].toFixed(6)),
+				rect:
+					g.length === 1
+						? null
+						: [(padX + col * tileW) / CANVAS_W, (padY + row * tileH) / CANVAS_H, tileW / CANVAS_W, tileH / CANVAS_H],
+				crop: null,
+				gain_db: 0,
+				fade_in: 0,
+				fade_out: 0,
+				freeze: 0,
+				clip: clipId(h.video),
+				name: h.word,
+			});
+		}
+		captions.push({
+			start: r3(rec),
+			end: r3(rec + duration),
+			text: [...new Set(g.map((h) => h.word))].join(' / '),
+		});
+		markers.push({
+			t: r3(rec),
+			name: g.length === 1 ? `hit ${i + 1}/${groups.length}` : `tile x${g.length} ${i + 1}/${groups.length}`,
+			note: g.map((h) => `${clipId(h.video)} ${h.start.toFixed(2)}`).join(', '),
+		});
+		rec += duration;
+	}
+	return { version: 1, name, origin: 'supercut', fps: null, width: 1920, height: 1080, clips, captions, markers };
 }
 
 export async function buildSupercut(opts: SupercutOptions): Promise<SupercutResult> {
@@ -434,9 +507,22 @@ export async function buildSupercut(opts: SupercutOptions): Promise<SupercutResu
 			signal,
 		);
 
+		// The cut list sits beside the mp4 so the render can be exported to an
+		// editor later. A failure here shouldn't lose the finished render.
+		let cutsFile: string | null = resolvePath(outFile.replace(/\.mp4$/, '.cuts.json'));
+		try {
+			const cuts = await buildCutList(basename(outFile, '.mp4'), groups);
+			await writeFile(cutsFile, JSON.stringify(cuts, null, 1));
+			onLog(`Cut list: ${cutsFile}`);
+		} catch (err) {
+			onLog(`Warning: could not write the cut list: ${err instanceof Error ? err.message : err}`);
+			cutsFile = null;
+		}
+
 		onLog(`Done: ${outFile}`);
 		return {
 			outFile: resolvePath(outFile),
+			cutsFile,
 			totalHits: hits.length,
 			segments: groups.length,
 			tiledSegments,

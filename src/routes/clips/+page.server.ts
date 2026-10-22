@@ -8,6 +8,8 @@ export interface ClipInfo {
 	file: string;
 	sizeMB: number;
 	modified: number;
+	/** A `.cuts.json` cut list sits beside the mp4, so it can be exported to Resolve. */
+	hasCuts: boolean;
 }
 
 export const load: PageServerLoad = async () => {
@@ -21,6 +23,7 @@ export const load: PageServerLoad = async () => {
 		} catch {
 			continue;
 		}
+		const names = new Set(entries);
 		for (const file of entries) {
 			if (extname(file).toLowerCase() !== '.mp4') continue;
 			const info = await stat(join(bucket.supercutsDir, file)).catch(() => null);
@@ -30,6 +33,7 @@ export const load: PageServerLoad = async () => {
 				file,
 				sizeMB: Number((info.size / 1024 / 1024).toFixed(1)),
 				modified: info.mtimeMs,
+				hasCuts: file.endsWith('.mp4') && names.has(file.replace(/\.mp4$/, '.cuts.json')),
 			});
 		}
 	}

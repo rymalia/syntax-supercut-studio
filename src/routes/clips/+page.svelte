@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { invalidateAll } from '$app/navigation';
+	import ExportForResolve from '$lib/ExportForResolve.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -117,6 +118,9 @@
 						</a>
 						<button class="btn-small" onclick={() => del(clip.bucket, clip.file)}>Delete</button>
 					</div>
+					{#if clip.hasCuts}
+						<ExportForResolve target={{ bucket: clip.bucket, file: clip.file }} />
+					{/if}
 				</div>
 			{/if}
 		</div>

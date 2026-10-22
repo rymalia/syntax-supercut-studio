@@ -12,6 +12,17 @@ git diff --stat upstream-baseline
 
 Changes are not sent upstream. Newest first; group entries by date.
 
+## 2026-10-21
+
+### Added
+- **Export for Resolve.** Supercut, sentence and film renders can be opened as
+  a DaVinci Resolve (or Final Cut) timeline cut from the original source files.
+  Supercut now saves a cut list (`<render>.cuts.json`) beside each mp4, and an
+  "Export for Resolve" button on `/clips` and in the job panel runs the engine's
+  `export` and downloads the `.fcpxml` plus an `.srt` of the hits. Supercuts
+  rendered before this have no cut list and can't be exported. Deleting a clip
+  also removes its cut list and exports.
+
 ## 2026-10-17
 
 ### Added
