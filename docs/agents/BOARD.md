@@ -36,3 +36,4 @@ Each agent reads this file and its inbox (`docs/agents/inbox/<agent>.md`) at the
 | B28 | "Engine renders" list (films/out) with play + Export for Resolve | code | done | | on `/clips` (tab + section): lists `films/out/*.mp4` incl. drafts; export only when the plan has render times `t` and isn't newer than the mp4 (Plan alone overwrites it) |
 | B29 | `/sentence` runs `qa --film <tmp>` and drops its short-lived `films/` copy | code | todo | | engine `qa --film` landed in `0a18092` |
 | B30 | `/people` warns before renaming or removing a name that a film's `cast` uses (list the films) | code | todo | | from desktop 2026-10-22: renaming `hanks`/`hoffman` broke The Briefing's cast |
+| B31 | Songify pitch into Resolve: after FCPXML import, a Resolve script sets `AudioPitchSemiTones` per item from a cut list `semitones` field | code+desktop | todo | | backlog, not a current priority (Ryan 2026-10-22); FCPXML has no pitch parameter |
