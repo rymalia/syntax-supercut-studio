@@ -27,7 +27,10 @@ for id in $NEW; do
 done; wait; echo AUDIO_DONE
 # 2. ASR (one model load)
 WAVS=""; for id in $NEW; do [ -f transcripts/$id.json ] || WAVS="$WAVS audio/$id.wav"; done
-[ -n "$WAVS" ] && ~/.local/bin/parakeet-mlx $WAVS --output-format json --output-dir transcripts
+# English-only Parakeet v2, pinned (Ryan 2026-10-22): the engine's word matching is English-only anyway, and the app or a
+# non-login shell may not inherit PARAKEET_MODEL from ~/.zshenv. The app's /transcribe stays on v3 (multilingual).
+PARAKEET_MODEL_INGEST="mlx-community/parakeet-tdt-0.6b-v2"
+[ -n "$WAVS" ] && ~/.local/bin/parakeet-mlx $WAVS --model "$PARAKEET_MODEL_INGEST" --output-format json --output-dir transcripts
 echo ASR_DONE
 # 3. proxies + faces
 one() { id=$1; [ -f faces/$id.jsonl.done ] && return

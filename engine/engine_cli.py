@@ -12,6 +12,7 @@ Commands
   people                         identity clusters that can be cast: id "<clip>/<cluster>", clip name, seconds on
                                  screen, admissible words, thumbnail strip + index, plus the names in people.json
   grep --q "<phrase>" [--limit N] who says the phrase (sub-phrase search over the phrase bank), with times
+  attribute --spans <file> [--cast X ...] annotate transcript word spans with engine attributes
   check --film <path>            per-line buildability of a film JSON (no render): takes it would use, or why not
   plan  --film <path> [--sheet]  solve the film and write films/out/<name>.plan.json (+ .plan.jpg contact sheet from proxies)
   render --film <path> [--draft] full render -> films/out/<name>.mp4 (+ plan.json); LOG lines carry progress
@@ -129,6 +130,47 @@ def cmd_grep(a):
                                  "asd": r["asd"], "final": r["final"], "words": r["n"], "text": r["text"]}); break
     hits.sort(key=lambda h: -h["words"])
     result({"ok": True, "query": a.q, "count": len(hits), "hits": hits[:a.limit]})
+
+def cmd_attribute(a):
+    import supercut2 as S
+    spans = json.load(open(a.spans)); allowed = set().union(*(S.ids_of(x) for x in (a.cast or [])))
+    for x in a.cast or []:
+        known = x in S.PEOPLE or x in S.CLIPS
+        if not known and "/" in x:
+            cid, cluster = x.split("/", 1); ident = S.ident(cid)
+            known = cid in S.CLIPS and ident is not None and cluster in {str(v) for v in ident[0].values()}
+        if not known: log(f"cast {x} matches no person")
+    out = []; index = {}
+    for span in spans:
+        cid = span.get("clip")
+        wanted = span.get("words") or []
+        try: source = S.words(cid)
+        except (FileNotFoundError, TypeError): source = None
+        found = []
+        if source is not None:
+            if cid not in index:          # (start, end) -> word indices; zero-length words can share a time
+                index[cid] = {}
+                for i, w in enumerate(source): index[cid].setdefault((w.get("start"), w.get("end")), []).append(i)
+            for start, end, text in wanted:
+                match = next(((i, source[i]) for i in index[cid].get((start, end), [])
+                              if S.norm(source[i].get("n", source[i].get("w", ""))) == S.norm(text)), None)
+                if match is None: found = []; break
+                found.append(match)
+        if not found or len(found) != len(wanted):
+            out.append({"known": False}); continue
+        words = [w for _, w in found]; persons = []
+        for w in words:
+            person = S.person_of(cid, w.get("track"), w.get("start"))
+            if person not in persons: persons.append(person)
+        person = persons[0] if len(set(persons)) == 1 else None
+        annotated = {"known": True, "words": [[w["start"], w["end"], w.get("w", w.get("text", ""))] for w in words],
+                     "person": person, "persons": persons, "onscreen": all(w.get("onscreen", False) for w in words),
+                     "asd": min(w["asd"] for w in words), "face_h": min(w["face_h"] for w in words)}
+        if a.cast: annotated["in_cast"] = all(S.allowed_word(cid, i, allowed) for i, _ in found)
+        out.append(annotated)
+    seen = {p for o in out for p in o.get("persons", [])}
+    names = {p: n for n, ids in S.PEOPLE.items() for p in ids if p in seen}
+    result({"ok": True, "spans": out, "names": names})
 
 def load_film(path):
     film = json.load(open(path)); name = os.path.splitext(os.path.basename(path))[0]
@@ -289,6 +331,7 @@ def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("people"); sub.add_parser("stats"); sub.add_parser("ingest")
     g = sub.add_parser("grep"); g.add_argument("--q", required=True); g.add_argument("--limit", type=int, default=60)
+    at = sub.add_parser("attribute"); at.add_argument("--spans", required=True); at.add_argument("--cast", action="append")
     for n in ("check", "plan", "render"):
         s = sub.add_parser(n); s.add_argument("--film", required=True)
         if n == "plan": s.add_argument("--sheet", action="store_true")
