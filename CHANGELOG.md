@@ -15,6 +15,8 @@ Changes are not sent upstream. Newest first; group entries by date.
 ## 2026-10-21
 
 ### Added
+- **Favicon.** A black film reel (four holes, a strip of film curling off it) on the lime accent square
+  (`static/favicon.svg`, plus `favicon.ico` 16/32/48 and a 180 px `apple-touch-icon.png`).
 - **Cast and on-screen filters for supercut and songify.** Both pages can keep
   only hits spoken by one person or a `people.json` group (the same picker as
   `/sentence`) and only speech where the speaker is on screen. Phrase and regex
