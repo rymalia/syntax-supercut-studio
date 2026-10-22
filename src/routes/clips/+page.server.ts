@@ -38,7 +38,7 @@ async function listEngineRenders(): Promise<EngineRenderInfo[]> {
 	}
 	const renders: EngineRenderInfo[] = [];
 	for (const file of entries) {
-		const m = /^([a-z0-9_-]+?)(\.draft)?\.mp4$/.exec(file);
+		const m = /^(.+?)(\.draft)?\.mp4$/.exec(file);
 		if (!m) continue;
 		const info = await stat(join(outDir, file)).catch(() => null);
 		if (!info || !info.isFile()) continue;
@@ -46,7 +46,8 @@ async function listEngineRenders(): Promise<EngineRenderInfo[]> {
 		let exportable = false;
 		let planNewer = false;
 		const planFile = join(outDir, `${plan}.plan.json`);
-		const planInfo = await stat(planFile).catch(() => null);
+		// Hand-run renders can have any name, but only engine-style names can be exported.
+		const planInfo = /^[a-z0-9_-]+$/.test(plan) ? await stat(planFile).catch(() => null) : null;
 		if (planInfo?.isFile()) {
 			planNewer = planInfo.mtimeMs > info.mtimeMs + 1000;
 			try {
@@ -54,7 +55,7 @@ async function listEngineRenders(): Promise<EngineRenderInfo[]> {
 				exportable =
 					Array.isArray(snippets) &&
 					snippets.length > 0 &&
-					snippets.every((s) => s && typeof s === 'object' && 't' in s);
+					snippets.every((s) => Number.isFinite((s as { t?: unknown } | null)?.t));
 			} catch {
 				exportable = false;
 			}

@@ -9,6 +9,8 @@
 	let selected = $state<string | null>(null);
 	let activeBucket = $state<string>('all');
 
+	// Not a possible bucket name (buckets are directory names), so a bucket called "engine" stays reachable.
+	const ENGINE_TAB = '\0engine';
 	const bucketTabs = $derived(['all', ...data.buckets]);
 
 	const filtered = $derived.by(() => {
@@ -78,9 +80,9 @@
 		<button
 			type="button"
 			class="btn-small"
-			class:btn-primary={activeBucket === 'engine'}
-			class:btn-ghost={activeBucket !== 'engine'}
-			onclick={() => (activeBucket = 'engine')}
+			class:btn-primary={activeBucket === ENGINE_TAB}
+			class:btn-ghost={activeBucket !== ENGINE_TAB}
+			onclick={() => (activeBucket = ENGINE_TAB)}
 		>
 			engine renders
 		</button>
@@ -93,7 +95,7 @@
 	/>
 </section>
 
-{#if activeBucket !== 'engine'}
+{#if activeBucket !== ENGINE_TAB}
 <section class="clip-grid">
 	{#each filtered as clip (clip.bucket + '::' + clip.file)}
 		{@const key = `${clip.bucket}::${clip.file}`}
@@ -149,7 +151,7 @@
 </section>
 {/if}
 
-{#if activeBucket === 'all' || activeBucket === 'engine'}
+{#if activeBucket === 'all' || activeBucket === ENGINE_TAB}
 	<section class="stack">
 		<h3>Engine renders</h3>
 		<p class="muted">Sentence and film renders from the talking-heads engine (<code>films/out</code>).</p>
