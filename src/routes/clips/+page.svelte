@@ -20,6 +20,15 @@
 		});
 	});
 
+	const filteredRenders = $derived.by(() => {
+		const q = filter.trim().toLowerCase();
+		return q ? data.engineRenders.filter((r) => r.file.toLowerCase().includes(q)) : data.engineRenders;
+	});
+
+	function engineUrl(file: string): string {
+		return `/api/engine-media/films/out/${encodeURIComponent(file)}`;
+	}
+
 	function mediaUrl(bucket: string, file: string): string {
 		return `/api/media/${encodeURIComponent(bucket)}/supercuts/${encodeURIComponent(file)}`;
 	}
@@ -48,7 +57,9 @@
 	<h1>
 		Rendered <mark>Clips</mark>.
 	</h1>
-	<p class="muted">{data.clips.length} supercuts across {data.buckets.length} buckets.</p>
+	<p class="muted">
+		{data.clips.length} supercuts across {data.buckets.length} buckets, {data.engineRenders.length} engine renders.
+	</p>
 </section>
 
 <section class="row" style="justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
@@ -64,6 +75,15 @@
 				{b}
 			</button>
 		{/each}
+		<button
+			type="button"
+			class="btn-small"
+			class:btn-primary={activeBucket === 'engine'}
+			class:btn-ghost={activeBucket !== 'engine'}
+			onclick={() => (activeBucket = 'engine')}
+		>
+			engine renders
+		</button>
 	</div>
 	<input
 		type="search"
@@ -73,6 +93,7 @@
 	/>
 </section>
 
+{#if activeBucket !== 'engine'}
 <section class="clip-grid">
 	{#each filtered as clip (clip.bucket + '::' + clip.file)}
 		{@const key = `${clip.bucket}::${clip.file}`}
@@ -126,3 +147,63 @@
 		</div>
 	{/each}
 </section>
+{/if}
+
+{#if activeBucket === 'all' || activeBucket === 'engine'}
+	<section class="stack">
+		<h3>Engine renders</h3>
+		<p class="muted">Sentence and film renders from the talking-heads engine (<code>films/out</code>).</p>
+	</section>
+	<section class="clip-grid">
+		{#each filteredRenders as render (render.file)}
+			{@const key = `engine::${render.file}`}
+			<div class="clip-tile">
+				<button
+					type="button"
+					onclick={() => (selected = selected === key ? null : key)}
+					style="all: unset; cursor: pointer; display: grid; gap: 0.75rem;"
+				>
+					<video
+						src={engineUrl(render.file)}
+						preload="metadata"
+						muted
+						playsinline
+						onmouseenter={(e) => (e.currentTarget as HTMLVideoElement).play().catch(() => {})}
+						onmouseleave={(e) => {
+							const v = e.currentTarget as HTMLVideoElement;
+							v.pause();
+							v.currentTime = 0;
+						}}
+					></video>
+					<div class="clip-tile__name">
+						<span class="tag" style="margin-inline-end: 0.4em;">{render.draft ? 'draft' : 'engine'}</span>
+						{render.file}
+					</div>
+					<div class="clip-tile__meta">
+						<span>{render.sizeMB} MB</span>
+						<span>{formatDate(render.modified)}</span>
+					</div>
+				</button>
+
+				{#if selected === key}
+					<div style="margin-block-start: 1rem;">
+						<!-- svelte-ignore a11y_media_has_caption -->
+						<video controls src={engineUrl(render.file)} style="inline-size: 100%; aspect-ratio: 16/9;"></video>
+						<div class="row" style="margin-block-start: 0.75rem;">
+							<a class="btn btn-ghost btn-small" href={engineUrl(render.file)} download>Download</a>
+						</div>
+						{#if render.exportable && !render.planNewer}
+							<ExportForResolve target={{ plan: render.plan }} />
+						{:else if render.planNewer}
+							<p class="help">Its plan was rewritten after this render, so it can't be exported. Render it again to export.</p>
+						{:else}
+							<p class="help">No exportable plan for this render (a plan from Plan alone has no render times).</p>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		{:else}
+			<p class="muted">No engine renders{filter.trim() ? ' match the filter' : ''}.</p>
+		{/each}
+	</section>
+{/if}
