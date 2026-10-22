@@ -37,10 +37,11 @@ export const GET: RequestHandler = async ({ params }) => {
 	// What "Export for Resolve" (POST /api/export) should be given for this job.
 	let exportTarget: { bucket: string; file: string } | { plan: string } | null = null;
 	const result = job.status === 'done' ? (job.result as Record<string, unknown> | null) : null;
-	if (job.kind === 'supercut' && typeof result?.cutsFile === 'string' && typeof result.outFile === 'string') {
+	if ((job.kind === 'supercut' || job.kind === 'songify') && typeof result?.cutsFile === 'string' && typeof result.outFile === 'string') {
 		const loc = bucketForPath(result.outFile);
 		if (loc?.kind === 'supercuts') exportTarget = { bucket: loc.bucket, file: basename(result.outFile) };
 	} else if ((job.kind === 'sentence' || job.kind === 'film-render') && typeof result?.plan === 'string') {
+		// Not film-plan: `export --plan` needs the timeline positions that only a render adds to the plan.
 		const plan = result.plan;
 		if (plan.endsWith('.plan.json') && dirname(plan) === join(engineDir(), 'films', 'out')) {
 			exportTarget = { plan: basename(plan, '.plan.json') };

@@ -232,9 +232,11 @@
 				Open
 			</a>
 		</div>
-		{#if jobState.exportTarget}
-			<ExportForResolve target={jobState.exportTarget} />
-		{/if}
+	{/if}
+
+	{#if jobState.job.status === 'done' && jobState.exportTarget}
+		<!-- Any render with edit decisions: a cut list beside the mp4, or the engine's plan. -->
+		<ExportForResolve target={jobState.exportTarget} />
 	{/if}
 
 	<details style="margin-block-start: 1rem;" open={jobState.job.status !== 'done'}>

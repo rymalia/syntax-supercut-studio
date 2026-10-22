@@ -22,6 +22,10 @@ Changes are not sent upstream. Newest first; group entries by date.
   `export` and downloads the `.fcpxml` plus an `.srt` of the hits. Supercuts
   rendered before this have no cut list and can't be exported. Deleting a clip
   also removes its cut list and exports.
+- **Songify exports too.** Songify saves the same cut list, so its renders get
+  "Export for Resolve" on `/clips` and in the job panel. Resolve can't take the
+  pitch shifts from the timeline file, so each note's shift (in semitones) is in
+  its clip name and marker for applying by hand.
 
 ## 2026-10-17
 

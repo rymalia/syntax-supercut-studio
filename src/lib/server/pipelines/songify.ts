@@ -6,6 +6,7 @@ import { resolveBuckets, PITCH_CACHE_FILE } from '../paths.js';
 import { runFfmpeg, atempoChain, throwIfAborted, CancelledError, type LogFn } from '../ffmpeg.js';
 import { slugify, timestampSuffix, type Hit } from '../text.js';
 import { collectHits } from '../hits.js';
+import { clipId, writeCutList, type CutClip, type CutMarker } from '../cutlist.js';
 
 const CANVAS_W = 1280;
 const CANVAS_H = 720;
@@ -89,6 +90,13 @@ function noteToMidi(note: string): number {
 
 function hzToMidi(hz: number): number {
 	return 69 + 12 * Math.log2(hz / 440);
+}
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+function midiToName(midi: number): string {
+	const m = Math.round(midi);
+	return `${NOTE_NAMES[((m % 12) + 12) % 12]}${Math.floor(m / 12) - 1}`;
 }
 
 function midiToHz(midi: number): number {
@@ -270,6 +278,8 @@ export interface SongifyOptions {
 
 export interface SongifyResult {
 	outFile: string;
+	/** Cut list v1 beside the mp4 (`<render>.cuts.json`); null if writing failed. */
+	cutsFile: string | null;
 	notes: number;
 	naturalRange: { minHz: number; maxHz: number } | null;
 }
@@ -343,6 +353,11 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 		const transposedMelody = melody.map((m) => m + octaveShift * 12);
 
 		const clipPaths: string[] = [];
+		// Cut list: each note is its word at the source's own speed. The cut list has
+		// no pitch field, so each note's shift goes in its name and marker for the editor.
+		const cutClips: CutClip[] = [];
+		const cutMarkers: CutMarker[] = [];
+		let rec = 0;
 		for (let i = 0; i < transposedMelody.length; i++) {
 			throwIfAborted(signal);
 			const pick = picks[i];
@@ -361,6 +376,17 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 			const clipPath = join(workDir, `note-${String(i).padStart(4, '0')}.mp4`);
 			await renderNote(pick, effectiveTarget, noteSeconds, clipPath, onLog, signal);
 			clipPaths.push(clipPath);
+
+			const segmentDur = Math.min(pick.end - pick.start, noteSeconds);
+			const semitones = effectiveTarget - pick.pitchMidi;
+			const shiftLabel = Math.abs(semitones) < 0.01 ? '0 st' : `${semitones > 0 ? '+' : ''}${semitones.toFixed(2)} st`;
+			cutClips.push({ video: pick.video, rec, in: pick.start, out: pick.start + segmentDur, name: `${pick.word} ${shiftLabel}` });
+			cutMarkers.push({
+				t: rec,
+				name: `note ${i + 1}/${transposedMelody.length} ${midiToName(effectiveTarget)}`,
+				note: `${clipId(pick.video)} ${pick.start.toFixed(2)}; pitch ${shiftLabel} (${midiToName(pick.pitchMidi)} -> ${midiToName(effectiveTarget)})`,
+			});
+			rec += segmentDur;
 		}
 
 		const stamp = timestampSuffix();
@@ -412,9 +438,19 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 			signal,
 		);
 
+		// The render's cut list, for editor export. A failure here shouldn't lose the render.
+		let cutsFile: string | null = null;
+		try {
+			cutsFile = resolvePath(await writeCutList(outFile, 'songify', cutClips, [], cutMarkers));
+			onLog(`Cut list: ${cutsFile}`);
+		} catch (err) {
+			onLog(`Warning: could not write the cut list: ${err instanceof Error ? err.message : err}`);
+		}
+
 		onLog(`Done: ${outFile}`);
 		return {
 			outFile: resolvePath(outFile),
+			cutsFile,
 			notes: picks.length,
 			naturalRange: { minHz: midiToHz(minMidi), maxHz: midiToHz(maxMidi) },
 		};

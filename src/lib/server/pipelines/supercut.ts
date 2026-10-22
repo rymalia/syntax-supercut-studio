@@ -1,10 +1,11 @@
-import { mkdir, realpath, rm, writeFile } from 'node:fs/promises';
-import { basename, extname, join, resolve as resolvePath } from 'node:path';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { join, resolve as resolvePath } from 'node:path';
 import { resolveBuckets } from '../paths.js';
 import { runFfmpeg, atempoChain, throwIfAborted, type LogFn } from '../ffmpeg.js';
 import { slugify, timestampSuffix, type Hit } from '../text.js';
 import { collectHits } from '../hits.js';
 import { drawTextFilter } from '../drawtext.js';
+import { clipId, writeCutList, type CutClip, type CutMarker, type CutText } from '../cutlist.js';
 
 const CANVAS_W = 1280;
 const CANVAS_H = 720;
@@ -291,24 +292,11 @@ function estimateTotalDuration(groups: Hit[][]): number {
 	return total;
 }
 
-/**
- * Cut list v1 (docs/ENGINE_CONTRACT.md) for a render, so the engine's `export`
- * can rebuild it in an editor from the original sources. A solo hit is one
- * clip; a tile is one clip per hit at the same `rec`, placed at its cell.
- */
-async function buildCutList(name: string, groups: Hit[][]): Promise<Record<string, unknown>> {
-	const sources = new Map<string, string>();
-	const source = async (video: string) => {
-		let src = sources.get(video);
-		if (!src) sources.set(video, (src = await realpath(video)));
-		return src;
-	};
-	const clipId = (video: string) => basename(video, extname(video));
-	const r3 = (n: number) => Math.round(n * 1000) / 1000;
-
-	const clips: Record<string, unknown>[] = [];
-	const captions: Record<string, unknown>[] = [];
-	const markers: Record<string, unknown>[] = [];
+/** Cut list v1 for a render: a solo hit is one clip; a tile is one clip per hit at the same `rec`, placed at its cell. */
+function cutListFor(groups: Hit[][]): { clips: CutClip[]; captions: CutText[]; markers: CutMarker[] } {
+	const clips: CutClip[] = [];
+	const captions: CutText[] = [];
+	const markers: CutMarker[] = [];
 	let rec = 0;
 	for (let i = 0; i < groups.length; i++) {
 		const g = groups[i];
@@ -325,41 +313,30 @@ async function buildCutList(name: string, groups: Hit[][]): Promise<Record<strin
 			const col = j % cols;
 			const row = Math.floor(j / cols);
 			clips.push({
-				media: 'av',
+				video: h.video,
 				track: j + 1,
-				rec: r3(rec),
-				src: await source(h.video),
-				in: r3(h.start),
+				rec,
+				in: h.start,
 				// renderTile trims each source at the word's end, so a word clamped at the
 				// slowdown limit ends before the tile does; the cut ends where the render does.
-				out: r3(g.length === 1 ? h.end : Math.min(h.end, h.start + duration * speeds[j])),
-				speed: Number(speeds[j].toFixed(6)),
+				out: g.length === 1 ? h.end : Math.min(h.end, h.start + duration * speeds[j]),
+				speed: speeds[j],
 				rect:
 					g.length === 1
 						? null
 						: [(padX + col * tileW) / CANVAS_W, (padY + row * tileH) / CANVAS_H, tileW / CANVAS_W, tileH / CANVAS_H],
-				crop: null,
-				gain_db: 0,
-				fade_in: 0,
-				fade_out: 0,
-				freeze: 0,
-				clip: clipId(h.video),
 				name: h.word,
 			});
 		}
-		captions.push({
-			start: r3(rec),
-			end: r3(rec + duration),
-			text: [...new Set(g.map((h) => h.word))].join(' / '),
-		});
+		captions.push({ start: rec, end: rec + duration, text: [...new Set(g.map((h) => h.word))].join(' / ') });
 		markers.push({
-			t: r3(rec),
+			t: rec,
 			name: g.length === 1 ? `hit ${i + 1}/${groups.length}` : `tile x${g.length} ${i + 1}/${groups.length}`,
 			note: g.map((h) => `${clipId(h.video)} ${h.start.toFixed(2)}`).join(', '),
 		});
 		rec += duration;
 	}
-	return { version: 1, name, origin: 'supercut', fps: null, width: 1920, height: 1080, clips, captions, markers };
+	return { clips, captions, markers };
 }
 
 export async function buildSupercut(opts: SupercutOptions): Promise<SupercutResult> {
@@ -509,14 +486,15 @@ export async function buildSupercut(opts: SupercutOptions): Promise<SupercutResu
 
 		// The cut list sits beside the mp4 so the render can be exported to an
 		// editor later. A failure here shouldn't lose the finished render.
-		let cutsFile: string | null = resolvePath(outFile.replace(/\.mp4$/, '.cuts.json'));
+		// The cut list sits beside the mp4 so the render can be exported to an
+		// editor later. A failure here shouldn't lose the finished render.
+		let cutsFile: string | null = null;
 		try {
-			const cuts = await buildCutList(basename(outFile, '.mp4'), groups);
-			await writeFile(cutsFile, JSON.stringify(cuts, null, 1));
+			const cuts = cutListFor(groups);
+			cutsFile = resolvePath(await writeCutList(outFile, 'supercut', cuts.clips, cuts.captions, cuts.markers));
 			onLog(`Cut list: ${cutsFile}`);
 		} catch (err) {
 			onLog(`Warning: could not write the cut list: ${err instanceof Error ? err.message : err}`);
-			cutsFile = null;
 		}
 
 		onLog(`Done: ${outFile}`);
