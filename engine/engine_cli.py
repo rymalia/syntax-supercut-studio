@@ -25,14 +25,77 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 PY = os.path.join(HERE, "asd", ".venv", "bin", "python")
 FF = "/opt/homebrew/bin/ffmpeg"
 
+import signal, stat, tempfile
+from datetime import datetime, timezone
+
 def log(msg):
     print("LOG " + str(msg).replace("\n", " "), flush=True)
 
+# ---------- activity log (B6, engine half) ----------
+# Commands that change something append one line to <engine>/activity.jsonl (format: docs/ENGINE_CONTRACT.md, Activity log).
+# The app already logs the jobs it starts, so only runs it did not start are logged here (actor "desktop": chat or shell).
+ACT = {"cmd": None, "target": ""}
+LOGGED = {"plan", "render", "qa", "export", "ingest"}
+def started_by_app():
+    try:
+        comm = subprocess.run(["ps", "-o", "comm=", "-p", str(os.getppid())], capture_output=True, text=True).stdout.strip()
+        return os.path.basename(comm) in ("node", "bun", "deno") or os.environ.get("TH_ACTOR") == "app"
+    except Exception:
+        return False
+def activity(res):
+    if ACT["cmd"] not in LOGGED or started_by_app(): return
+    p = os.path.join(HERE, "activity.jsonl")
+    line = {"ts": datetime.now(timezone.utc).isoformat(), "actor": "desktop", "action": ACT["cmd"], "target": ACT["target"], "result": res}
+    try:   # a regular file with one link only: no symlink (O_NOFOLLOW), no FIFO (O_NONBLOCK + S_ISREG), no hard link elsewhere
+        fd = os.open(p, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o644)
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1: os.close(fd); return
+        with os.fdopen(fd, "a") as f: f.write(json.dumps(line) + "\n")
+    except OSError: pass
+
 def result(obj):
     print("RESULT " + json.dumps(obj), flush=True)
+    if obj.get("ok"):
+        summary = {"export": lambda o: os.path.basename(o.get("fcpxml", "")), "render": lambda o: os.path.basename(o.get("outFile", "")),
+                   "qa": lambda o: f'heard {o.get("heard")}/{o.get("total")}', "ingest": lambda o: f'{o.get("clips")} clips',
+                   "plan": lambda o: f'{len(o.get("snippets", []))} takes'}.get(ACT["cmd"], lambda o: "ok")
+        activity(summary(obj))
+    else:
+        activity("error: " + str(obj.get("error", ""))[:160])
 
 def fail(msg):
     result({"ok": False, "error": msg}); sys.exit(1)
+
+# ---------- cancellation (B21, engine half) ----------
+# The app cancels with SIGTERM to this process group, then SIGKILL after 10 s. Forward SIGTERM to the running child
+# (an ingest script, qa, ffmpeg) and give it a few seconds, so a direct signal to this process also stops the work.
+CHILD = {"p": None}
+def dump_atomic(obj, path):
+    """write JSON via a temp file + rename, so a cancel never leaves a truncated plan or cut list"""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-", suffix=".json")
+    with os.fdopen(fd, "w") as f: json.dump(obj, f, indent=1)
+    os.replace(tmp, path)
+
+TERM = {"seen": False}
+def _on_term(signum, frame):
+    if TERM["seen"]: return                         # a second SIGTERM (or our own group signal) while stopping: ignore
+    TERM["seen"] = True
+    if os.getpgrp() == os.getpid():                 # we lead our own group (the app spawns us that way): stop every
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)   # child, including ffmpeg started by subprocess.run in supercut2
+        try: os.killpg(os.getpid(), signal.SIGTERM)
+        except OSError: pass
+    p = CHILD["p"]
+    if p and p.poll() is None:
+        try:
+            p.terminate(); p.wait(timeout=5)
+        except Exception:
+            try: p.kill()
+            except Exception: pass
+    print("RESULT " + json.dumps({"ok": False, "error": "cancelled"}), flush=True)
+    try: activity("cancelled")
+    except Exception: pass
+    os._exit(143)
+signal.signal(signal.SIGTERM, _on_term)
 
 # ---------- commands ----------
 def cmd_people(a):
@@ -118,7 +181,8 @@ def cmd_plan(a):
         fail(str(e))
     for s in sn: s["clip_name"] = S.CLIPS[s["clip"]]
     os.makedirs(S.OUT, exist_ok=True)
-    pj = os.path.join(S.OUT, name + ".plan.json"); json.dump(sn, open(pj, "w"), indent=1)
+    # plan-only goes to <name>.planned.json: <name>.plan.json belongs to the last render (it carries the timeline "t" export reads)
+    pj = os.path.join(S.OUT, name + ".planned.json"); dump_atomic(sn, pj)
     out = {"ok": True, "name": name, "plan": pj, "snippets": sn, "lines": len(film["lines"]), "takes_per_line": round(len(sn) / max(len(film["lines"]), 1), 2),
            "persons": sorted({s["person"] for s in sn}), "speech_seconds": round(sum(s["out"] - s["in"] for s in sn), 2)}
     if a.sheet:
@@ -142,21 +206,29 @@ def cmd_render(a):
     log("mixing audio, captions, final encode")
     dst, starts = S.render(film, sn, name, a.draft)
     for s, st in zip(sn, starts): s["t"] = round(st, 3)
-    pj = os.path.join(S.OUT, name + ".plan.json"); json.dump(sn, open(pj, "w"), indent=1)
+    pj = os.path.join(S.OUT, name + ".plan.json"); dump_atomic(sn, pj)
     result({"ok": True, "name": name, "outFile": dst, "plan": pj, "snippets": len(sn), "lines": len(film["lines"]),
             "takes_per_line": round(len(sn) / max(len(film["lines"]), 1), 2), "persons": sorted({s["person"] for s in sn})})
 
 def cmd_qa(a):
-    p = subprocess.run([PY, os.path.join(HERE, "qa_film2.py"), a.name] + (["--no-sheet"] if a.no_sheet else []), capture_output=True, text=True, cwd=HERE)
-    for l in p.stdout.splitlines(): log(l)
+    if a.film:
+        a.film = os.path.abspath(a.film)                                    # qa_film2 runs with cwd = the engine dir
+        a.name = os.path.splitext(os.path.basename(a.film))[0]              # same name render used for films/out/<name>.*
+    if not a.name: fail("qa needs --name or --film")
+    p = subprocess.Popen([PY, os.path.join(HERE, "qa_film2.py"), a.name] + (["--film", a.film] if a.film else []) + (["--no-sheet"] if a.no_sheet else []),
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=HERE)
+    CHILD["p"] = p
+    out, err = p.communicate()
+    for l in out.splitlines(): log(l)
     qj = os.path.join(HERE, "films", "out", a.name + ".qa.json")
-    if p.returncode != 0 or not os.path.exists(qj): fail("qa failed: " + p.stderr[-800:])
+    if p.returncode != 0 or not os.path.exists(qj): fail("qa failed: " + err[-800:])
     j = json.load(open(qj)); j["ok"] = True; j["name"] = a.name
     j["sheets"] = [os.path.join(HERE, "films", "out", f) for f in sorted(os.listdir(os.path.join(HERE, "films", "out"))) if f.startswith(a.name + ".sheet")]
     result(j)
 
 def stream(cmd, cwd=HERE, env=None):
     p = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
+    CHILD["p"] = p
     for line in p.stdout:
         line = line.rstrip()
         if line: log(line)
@@ -200,12 +272,16 @@ def cmd_export(a):
     import export_cuts as X
     if a.plan:
         if not re.fullmatch(r"[a-z0-9_-]+", a.plan): fail("bad plan name")
-        if not os.path.exists(os.path.join(HERE, "films", "out", a.plan + ".plan.json")): fail(f"no plan for {a.plan}")
+        if not any(os.path.exists(os.path.join(HERE, "films", "out", a.plan + e)) for e in (".plan.json", ".planned.json")): fail(f"no plan for {a.plan}")
         log(f"export: plan {a.plan}"); cl = X.from_plan(a.plan)
     else:
         log(f"export: cut list {a.cuts}"); cl = json.load(open(a.cuts))
     out = a.out or os.path.join(HERE, "films", "out")
+    if a.plan:
+        os.makedirs(out, exist_ok=True)
+        cp = os.path.join(out, X.safe(cl["name"]) + ".cuts.json"); dump_atomic(cl, cp)
     r = X.build(cl, out)
+    if a.plan: r["cuts"] = cp
     log(f"export: {r['clips']} items from {r['sources']} sources at {r['fps']} fps -> {r['fcpxml']}")
     result({"ok": True, **r})
 
@@ -219,8 +295,12 @@ def main():
         if n == "render": s.add_argument("--draft", action="store_true")
     e = sub.add_parser("export"); eg = e.add_mutually_exclusive_group(required=True)
     eg.add_argument("--plan"); eg.add_argument("--cuts"); e.add_argument("--out")
-    q = sub.add_parser("qa"); q.add_argument("--name", required=True); q.add_argument("--no-sheet", action="store_true")
+    q = sub.add_parser("qa"); qg = q.add_mutually_exclusive_group(required=True)
+    qg.add_argument("--name"); qg.add_argument("--film"); q.add_argument("--no-sheet", action="store_true")
     a = ap.parse_args()
+    ACT["cmd"] = a.cmd
+    ACT["target"] = getattr(a, "film", None) and os.path.splitext(os.path.basename(a.film))[0] or getattr(a, "plan", None) \
+        or getattr(a, "name", None) or (getattr(a, "cuts", None) and os.path.basename(a.cuts)) or ""
     try:
         globals()["cmd_" + a.cmd](a)
     except SystemExit:

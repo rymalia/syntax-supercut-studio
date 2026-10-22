@@ -621,7 +621,8 @@ def render(film, snippets, name, draft=False):
     joined = os.path.join(CACHE, name + "_v2_joined.mov")
     subprocess.run([FF, "-nostdin", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", joined], check=True)
     mixp = os.path.join(CACHE, name + "_v2_mix.wav"); build_audio(film, snippets, starts, total, mixp)
-    ass = os.path.join(CACHE, name + ".v2.ass"); open(ass, "w").write(build_ass(film, snippets, starts, title_d, credit_t, credit_d, credits))
+    # the subtitles filter parses its argument (quotes, colons, commas are syntax), so the .ass path must be plain
+    ass = os.path.join(CACHE, re.sub(r"[^A-Za-z0-9_.-]", "_", name) + "-" + hashlib.md5(name.encode()).hexdigest()[:8] + ".v2.ass"); open(ass, "w").write(build_ass(film, snippets, starts, title_d, credit_t, credit_d, credits))
     dst = os.path.join(OUT, name + (".draft" if draft else "") + ".mp4")
     subprocess.run([FF, "-nostdin", "-v", "error", "-y", "-i", joined, "-i", mixp, "-map", "0:v", "-map", "1:a", "-vf", f"subtitles={ass}",
                     "-c:v", "h264_videotoolbox", "-allow_sw", "1", "-b:v", "5M" if draft else "12M", "-pix_fmt", "yuv420p",
@@ -646,7 +647,7 @@ if __name__ == "__main__":
         print(f"  L{s['line']:02d} {s['clip']:5} {s['in']:8.2f}-{s['out']:8.2f} asd {s['asd']:5.2f} lvl {s['lvl']:6.1f} g {s['gain']:+5.1f}  {s['said']}{'  [fallback]' if s['fallback'] else ''}")
     report(snippets)
     if "--plan-only" in a:
-        json.dump(snippets, open(os.path.join(OUT, name + ".plan.json"), "w"), indent=1); sys.exit()
+        json.dump(snippets, open(os.path.join(OUT, name + ".planned.json"), "w"), indent=1); sys.exit()   # never clobbers a rendered plan
     dst, starts = render(film, snippets, name, "--draft" in a)
     for s, st in zip(snippets, starts): s["t"] = round(st, 3)
     json.dump(snippets, open(os.path.join(OUT, name + ".plan.json"), "w"), indent=1)

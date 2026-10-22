@@ -21,7 +21,9 @@ def whisper(path, beam=True):
 
 name = sys.argv[1]
 mp4 = os.path.join(OUT, name + ".mp4"); plan = json.load(open(os.path.join(OUT, name + ".plan.json")))
-film = json.load(open(os.path.join(HERE, "films", name + ".json")))
+# --film <path>: the film JSON lives elsewhere (the app's /sentence temp film); default films/<name>.json
+film_path = sys.argv[sys.argv.index("--film") + 1] if "--film" in sys.argv else os.path.join(HERE, "films", name + ".json")
+film = json.load(open(film_path))
 tmp = os.path.join(HERE, "films", "qa", name); os.makedirs(tmp, exist_ok=True)
 wav = os.path.join(tmp, "a.wav")
 subprocess.run([FF, "-nostdin", "-v", "error", "-y", "-i", mp4, "-ar", "16000", "-ac", "1", wav], check=True)

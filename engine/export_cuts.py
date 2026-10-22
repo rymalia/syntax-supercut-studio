@@ -3,7 +3,8 @@
 ORIGINAL source files.
 
   export_cuts.py --cuts list.json [--out DIR]          # app sidecar (supercut) or any cut list
-  export_cuts.py --plan NAME [--out DIR]               # engine film / sentence: films/out/NAME.plan.json
+  export_cuts.py --plan NAME [--out DIR]               # engine film / sentence: films/out/NAME.plan.json (rendered) or
+                                                       # NAME.planned.json (plan only)
 
 Cut list v1 (times in seconds, paths absolute):
 { "version": 1, "name": "...", "origin": "supercut|engine", "fps": null|"23.976"|"25"|..., "width": 1920, "height": 1080,
@@ -107,6 +108,28 @@ def build(cl, out_dir):
             last = s_in + play * fd * sp - sfd
             items.append(dict(base, sp=F(1, 50), s_in=max(F(0), (last // sfd) * sfd), rec=rec0 + play, play=hold, hold=0, n=hold,
                               x=dict(x, name=(x.get("name") or "") + " [freeze]")))
+    # Back-to-back items on one track. Picture: rec floors and play ceils, so neighbours can overlap by 1-2 frames, which an
+    # editor can't hold on one track; end each where the next one starts. Audio: an overlap is a deliberate cross-fade (engine
+    # takes overlap by xf_head + xf_tail), so it moves to the next free audio track (a checkerboard) instead of being cut.
+    pics = {}
+    for i in items:
+        if i["media"] != "a": pics.setdefault(i["track"], []).append(i)
+    for row in pics.values():
+        row.sort(key=lambda i: i["rec"])
+        for a, b in zip(row, row[1:]):
+            if a["rec"] + a["n"] > b["rec"]:
+                cut = a["rec"] + a["n"] - b["rec"]; a["n"] = max(1, a["n"] - cut); a["play"] = max(1, a["play"] - cut)
+    base = 1                                          # A1 up: each original audio track packs greedily above the last
+    groups = {}
+    for i in items:
+        if i["media"] == "a": groups.setdefault(i["track"], []).append(i)       # by ORIGINAL track, before any moves
+    for k in sorted(groups):
+        ends = {}
+        for i in sorted(groups[k], key=lambda i: i["rec"]):
+            t = base
+            while t in ends and ends[t] > i["rec"]: t += 1
+            i["track"] = t; ends[t] = i["rec"] + i["n"]
+        base = max(ends) + 1
     total = max(i["rec"] + i["n"] for i in items)
     # ---- spine = one gap over the whole edit, every item connected to it. Resolve reads a gap child's offset relative to the
     # gap (as FCP does) but a <video> child's as absolute, so a gap host is the one form both editors agree on.
@@ -205,8 +228,13 @@ def safe(name): return "".join(c if c.isalnum() or c in "-_." else "-" for c in 
 def from_plan(name):
     sys.path.insert(0, HERE)
     import supercut2 as S
-    snips = json.load(open(os.path.join(S.OUT, name + ".plan.json")))
+    pj = os.path.join(S.OUT, name + ".plan.json")
+    if not os.path.exists(pj): pj = os.path.join(S.OUT, name + ".planned.json")      # plan only, never rendered
+    snips = json.load(open(pj))
     film_p = os.path.join(HERE, "films", name + ".json"); film = json.load(open(film_p)) if os.path.exists(film_p) else {}
+    if any("t" not in s for s in snips):          # timeline positions as render() lays them out
+        t = film.get("title_dur", 3.0)
+        for s in snips: s["t"] = round(t, 3); t += s["out"] - s["in"] + s["hold"]
     t0 = min(s["t"] for s in snips); clips, caps = [], []
     for s in snips:
         src = os.path.join(S.SRC, S.CLIPS[s["clip"]]); dur = s["out"] - s["in"]; hold = s["hold"]

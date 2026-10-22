@@ -14,6 +14,8 @@ stdout, one record per line, in order:
 - `RESULT <json>` — exactly once, the last line. `{"ok": true, ...}` or `{"ok": false, "error": "..."}`.
 Exit code 0 on success, 1 on failure. stderr is noise (library warnings); keep the last ~40 lines for error display.
 Long commands (`render`, `ingest`, `qa`) must honour the job `AbortSignal`: kill the child process (SIGTERM) → mark job cancelled.
+On SIGTERM `engine_cli.py` stops its children (when it leads its own process group, as the app spawns it, it signals the whole
+group, so ffmpeg and ingest workers stop too), prints `RESULT {"ok": false, "error": "cancelled"}` and exits 143.
 
 ## Commands
 
@@ -22,11 +24,11 @@ Long commands (`render`, `ingest`, `qa`) must honour the job `AbortSignal`: kill
 | `people` | — | `{people: [{id, clip, clip_name, seconds, words, thumb, thumb_index}], names: {<name>: [ids]}, thumb_tile: 160, thumb_per_row: 8}` — `thumb` is a path relative to `TH_ENGINE_DIR` (a strip of 160×160 tiles, 8 per row; the tile for this person is at `thumb_index`, i.e. x = (idx % 8)·160, y = floor(idx / 8)·160). `names` is `people.json` (named groups of ids). |
 | `grep --q "<phrase>" [--limit N]` | sub-phrase search | `{query, count, hits: [{person, clip, clip_name, start, end, asd, final, words, text}]}` — `text` is the whole run containing the phrase. |
 | `check --film <path>` | film JSON path | `{name, lines: [{line, speaker, text, ok, takes?: [{clip, person, in, out, said, asd, fallback}], why?}], film: {ok, snippets?, lines?, takes_per_line?, persons?, why?}}` — per-line buildability on its own plus the whole-film solve (which also binds one person per speaker). |
-| `plan --film <path> [--sheet]` | | `{name, plan, snippets: [...], lines, takes_per_line, persons, speech_seconds, sheet?}` — `plan`/`sheet` are absolute paths under `<TH_ENGINE_DIR>/films/out/`. |
+| `plan --film <path> [--sheet]` | | `{name, plan, snippets: [...], lines, takes_per_line, persons, speech_seconds, sheet?}` — `plan`/`sheet` are absolute paths under `<TH_ENGINE_DIR>/films/out/`. A plan-only run writes `<name>.planned.json`; `<name>.plan.json` is only ever written by `render` (it carries each take's timeline position `t`), so planning never invalidates a rendered film's export. |
 | `render --film <path> [--draft]` | | `{name, outFile, plan, snippets, lines, takes_per_line, persons}` — `outFile` is the absolute mp4 path under `<TH_ENGINE_DIR>/films/out/`. LOG lines `progress i/n ...` while snippets render. |
-| `qa --name <name> [--no-sheet]` | after render | the QA record: `{name, cold, heard, total, ghosts, gate, missed, line_match, line_total, report: [..], acoustic: {...}, sheets: [paths]}`. |
+| `qa (--name <name> \| --film <path>) [--no-sheet]` | after render; `--film` reads the film JSON from that path (name = its basename), so a temp film needs no copy in `films/` | the QA record: `{name, cold, heard, total, ghosts, gate, missed, line_match, line_total, report: [..], acoustic: {...}, sheets: [paths]}`. |
 | `ingest` | — | `{clips, new_identities, buckets, review_batch}` where `buckets` is whether the Library bucket refresh succeeded and `review_batch` is the successful `<first>-<last>` speaker-review batch or `null` — long (minutes to an hour); streams LOG. Processes any media in `~/Downloads/talking-heads-videos` not yet in `clips.tsv`, then refreshes buckets and builds a review batch for clips added in this run (both post-ingest steps are tolerated if they fail). |
-| `export (--plan <name> \| --cuts <path>) [--out <dir>]` | an engine render's `films/out/<name>.plan.json`, or a cut list (below) | `{fcpxml, srt?, fps, frames, clips, sources}`: absolute paths of an FCPXML 1.10 timeline that references the **original source files** (for DaVinci Resolve's File › Import › Timeline, or Final Cut) and an `.srt` of the captions when there are any. `--out` defaults to `films/out/`. With `--plan` the converted cut list is also written as `<out>/<name>.cuts.json`. |
+| `export (--plan <name> \| --cuts <path>) [--out <dir>]` | an engine render's `films/out/<name>.plan.json`, or a cut list (below) | `{fcpxml, srt?, fps, frames, clips, sources}`: absolute paths of an FCPXML 1.10 timeline that references the **original source files** (for DaVinci Resolve's File › Import › Timeline, or Final Cut) and an `.srt` of the captions when there are any. `--out` defaults to `films/out/`. With `--plan` the converted cut list is also written as `<out>/<name>.cuts.json` (RESULT `cuts`); a plan-only `<name>.planned.json` exports too (positions derived as `render` would lay them out). Back-to-back picture items on one track are trimmed to end where the next begins (frame snapping used to overlap them by 1–2 frames); overlapping audio (engine cross-fades) moves to the next audio track instead (a checkerboard), with later tracks such as music shifted up. |
 | `stats` | — | `{people: [{person, words, runs4, longest, clip_name}]}` ranked by admissible on-screen words. |
 
 ## Film JSON (what the `/film` editor saves to `<TH_ENGINE_DIR>/films/<slug>.json`)
@@ -55,7 +57,9 @@ Transcripts for the engine's clips are mirrored into the buckets `talking-heads`
 
 The shared append-only activity log is `<TH_ENGINE_DIR>/activity.jsonl`. Each write is one JSON object on one line:
 `{"ts":"<ISO-8601 with Z or offset>","actor":"app|desktop|code","action":"...","target":"...","result":"..."}`.
-The app writes `actor: "app"`; `engine_cli.py` may append `actor: "desktop"` lines, and other code may use `actor: "code"`.
+The app writes `actor: "app"`; `engine_cli.py` appends `actor: "desktop"` lines for `plan`, `render`, `qa`, `export` and
+`ingest` runs the app did not start (its parent isn't node, and `TH_ACTOR` isn't `app`), so app jobs are never logged twice;
+`result` is a short summary (output file, `heard n/m`, `cancelled`, `error: ...`). Other code may use `actor: "code"`.
 Writers append without rewriting the file, and readers skip malformed lines.
 
 ## Cut list v1 (edit decisions for `export`)

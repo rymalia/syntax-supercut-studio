@@ -14,10 +14,11 @@ def runs_of(cid):
     ws = S.words(cid); out = []; cur = None
     for w in ws:
         good = S.ok(cid, w["i"]) and S.admissible(cid, w["i"])
-        if good and cur and w["i"] == cur["i1"] + 1 and w.get("seg") == cur["seg"] and w["start"] - ws[cur["i1"]]["end"] < 0.6:
+        pid = S.person_of(cid, w.get("track"), w["start"]) if good else None   # per word: a track can change person at a shot split
+        if good and cur and w["i"] == cur["i1"] + 1 and w.get("seg") == cur["seg"] and pid == cur["pid"] and w["start"] - ws[cur["i1"]]["end"] < 0.6:
             cur["i1"] = w["i"]
         elif good:
-            cur = {"clip": cid, "i0": w["i"], "i1": w["i"], "seg": w.get("seg"), "pid": S.person_of(cid, w.get("track"), w["start"])}; out.append(cur)
+            cur = {"clip": cid, "i0": w["i"], "i1": w["i"], "seg": w.get("seg"), "pid": pid}; out.append(cur)
         else:
             cur = None
     for r in out:
