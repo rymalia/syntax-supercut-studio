@@ -67,7 +67,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ id: job.id });
 		}
 		case 'supercut': {
-			const { target, regexSource, tile, limit, debug, dryRun } = body as Record<string, unknown>;
+			const { target, regexSource, tile, limit, debug, dryRun, cast, onscreen } = body as Record<string, unknown>;
 			if (!target && !regexSource) throw error(400, 'target or regexSource required');
 			if (regexSource) {
 				try {
@@ -83,6 +83,8 @@ export const POST: RequestHandler = async ({ request }) => {
 				limit: typeof limit === 'number' && Number.isFinite(limit) ? limit : null,
 				debug: Boolean(debug),
 				dryRun: Boolean(dryRun),
+				cast: asOptionalCast(cast),
+				onscreen: asOptionalBoolean(onscreen, 'onscreen'),
 				buckets,
 			});
 			return json({ id: job.id });
@@ -101,7 +103,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ id: job.id });
 		}
 		case 'songify': {
-			const { target, melody, bpm, subdivision, singleClip, noShift } = body as Record<
+			const { target, melody, bpm, subdivision, singleClip, noShift, cast, onscreen } = body as Record<
 				string,
 				unknown
 			>;
@@ -114,6 +116,8 @@ export const POST: RequestHandler = async ({ request }) => {
 				subdivision: typeof subdivision === 'number' ? subdivision : undefined,
 				singleClip: Boolean(singleClip),
 				noShift: Boolean(noShift),
+				cast: asOptionalCast(cast),
+				onscreen: asOptionalBoolean(onscreen, 'onscreen'),
 				buckets,
 			});
 			return json({ id: job.id });

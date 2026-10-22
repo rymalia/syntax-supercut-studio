@@ -60,6 +60,8 @@ export interface SerializableSupercutParams {
 	limit?: number | null;
 	debug?: boolean;
 	dryRun?: boolean;
+	cast?: string[] | null;
+	onscreen?: boolean;
 	buckets?: string[] | null;
 }
 
@@ -196,6 +198,8 @@ export function startSupercut(params: SerializableSupercutParams): Job {
 		limit: params.limit ?? null,
 		debug: params.debug ?? false,
 		dryRun: params.dryRun ?? false,
+		cast: params.cast ?? null,
+		onscreen: params.onscreen ?? false,
 		buckets: params.buckets ?? null,
 	};
 	runInBackground(job, (onLog, signal) => buildSupercut({ ...opts, onLog, signal }));

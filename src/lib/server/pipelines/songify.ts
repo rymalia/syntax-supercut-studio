@@ -16,6 +16,7 @@ import {
 } from '../render.js';
 import { slugify, timestampSuffix, type Hit } from '../text.js';
 import { collectHits } from '../hits.js';
+import { attributeHits } from '../engine-hits.js';
 import { clipId, writeCutList, type CutClip, type CutMarker } from '../cutlist.js';
 
 const CANVAS_W = 1280;
@@ -265,6 +266,8 @@ export interface SongifyOptions {
 	subdivision?: number;
 	singleClip?: boolean;
 	noShift?: boolean;
+	cast?: string[] | null;
+	onscreen?: boolean;
 	buckets?: string[] | null;
 	outDir?: string;
 	onLog?: LogFn;
@@ -289,6 +292,8 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 	const subdivision = opts.subdivision ?? 1;
 	const singleClip = opts.singleClip ?? false;
 	const noShift = opts.noShift ?? false;
+	const cast = opts.cast ?? null;
+	const onscreen = opts.onscreen ?? false;
 
 	const onLog = opts.onLog ?? (() => {});
 	const signal = opts.signal;
@@ -304,16 +309,22 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 	const melody = parseMelody(melodyStr);
 	onLog(`Melody: ${melodyStr} (${melody.length} notes @ ${bpm} bpm × ${subdivision})`);
 
-	const hits = await collectHits({
+	let hits = await collectHits({
 		target,
 		buckets: buckets.map((b) => b.name),
 		onLog,
 	});
+	hits = await attributeHits(hits, { cast, onscreen, onLog, signal });
 	onLog(`Found ${hits.length} hits`);
-	if (hits.length === 0) throw new Error('No hits found for target');
+	if (hits.length === 0) {
+		if (!cast?.length && !onscreen) throw new Error('No hits found for target');
+		const restriction = [cast?.length ? `by ${cast.join(', ')}` : '', onscreen ? '(on-screen)' : ''].filter(Boolean).join(' ');
+		throw new Error(`No hits found for "${target}"${restriction ? ` ${restriction}` : ''}`);
+	}
 
 	await mkdir(outDir, { recursive: true });
 	const slug = slugify(target);
+	const castSuffix = cast?.length ? `-${slugify(cast[0].replace(/[\/_]+/g, ' '))}` : '';
 	const workDir = join(outDir, `.tmp-songify-${slug}-${Date.now()}`);
 	await mkdir(workDir, { recursive: true });
 
@@ -382,7 +393,7 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 			cutMarkers.push({
 				t: rec,
 				name: `note ${i + 1}/${transposedMelody.length} ${midiToName(effectiveTarget)}`,
-				note: `${clipId(pick.video)} ${pick.start.toFixed(2)}; pitch ${shiftLabel} (${midiToName(pick.pitchMidi)} -> ${midiToName(effectiveTarget)})`,
+				note: `${clipId(pick.video)} ${pick.start.toFixed(2)}; pitch ${shiftLabel} (${midiToName(pick.pitchMidi)} -> ${midiToName(effectiveTarget)})${pick.person ? ` · ${pick.person} asd ${(pick.asd ?? 0).toFixed(2)}` : ''}`,
 			});
 			rec += renderedDuration(segmentDur);
 		}
@@ -404,7 +415,7 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 
 		const stamp = timestampSuffix();
 		const bucketTag = buckets.length > 1 ? 'mixed' : buckets[0].name;
-		const outFile = join(outDir, `${slug}-song-${bucketTag}-${stamp}.mp4`);
+		const outFile = join(outDir, `${slug}${castSuffix}-song-${bucketTag}-${stamp}.mp4`);
 		onLog(`Concatenating -> ${outFile}`);
 		await concatSegments(segments, outFile, workDir, onLog, signal);
 

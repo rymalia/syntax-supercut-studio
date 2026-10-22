@@ -75,6 +75,7 @@ export async function collectHits(opts: CollectHitsOptions): Promise<Hit[]> {
 		for (const f of files) {
 			const videoPath = await findVideoForTranscriptInBucket(f, bucket);
 			if (!videoPath) continue;
+			const clip = basename(f, '.json');
 
 			const data: Transcript = JSON.parse(
 				await readFile(join(bucket.transcriptsDir, f), 'utf8'),
@@ -137,6 +138,11 @@ export async function collectHits(opts: CollectHitsOptions): Promise<Hit[]> {
 						start: Math.max(0, first.start - PAD_BEFORE),
 						end: Math.min(data.duration, last.end + PAD_AFTER),
 						word: m[0],
+						clip,
+						words: words
+							.slice(firstWord, lastWord + 1)
+							.filter((w) => w.text !== '|') // on-screen buckets mark removed words with `|`
+							.map((w) => [w.start, w.end, w.text]),
 					});
 					count++;
 					if (m[0].length === 0) regex.lastIndex++;
@@ -164,6 +170,8 @@ export async function collectHits(opts: CollectHitsOptions): Promise<Hit[]> {
 						start: Math.max(0, first.start - PAD_BEFORE),
 						end: Math.min(data.duration, last.end + PAD_AFTER),
 						word: text,
+						clip,
+						words: words.slice(i, i + tokenCount).map((w) => [w.start, w.end, w.text]),
 					});
 					count++;
 				}

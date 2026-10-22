@@ -54,4 +54,8 @@ export interface Hit {
 	start: number;
 	end: number;
 	word: string;
+	clip?: string;
+	person?: string | null;
+	asd?: number;
+	words?: [number, number, string][];
 }

@@ -13,6 +13,7 @@ import {
 } from '../render.js';
 import { slugify, timestampSuffix, type Hit } from '../text.js';
 import { collectHits } from '../hits.js';
+import { attributeHits } from '../engine-hits.js';
 import { drawTextFilter } from '../drawtext.js';
 import { clipId, writeCutList, type CutClip, type CutMarker, type CutText } from '../cutlist.js';
 
@@ -117,7 +118,8 @@ async function renderSingle(
 	signal?: AbortSignal,
 ): Promise<void> {
 	const scaleChain = `scale=${CANVAS_W}:${CANVAS_H}:force_original_aspect_ratio=decrease,pad=${CANVAS_W}:${CANVAS_H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30`;
-	const vf = `${debug ? `${scaleChain},${drawTextFilter(hit.word)}` : scaleChain},tpad=stop_mode=clone:stop=-1`;
+	const debugText = hit.person ? `${hit.word} · ${hit.person}` : hit.word;
+	const vf = `${debug ? `${scaleChain},${drawTextFilter(debugText)}` : scaleChain},tpad=stop_mode=clone:stop=-1`;
 	await runFfmpeg(
 		[
 			'-ss',
@@ -168,7 +170,8 @@ async function renderTile(
 		const wordEnd = preRoll + (h.end - h.start);
 
 		const tileFontSize = Math.max(28, Math.round(tileH / 5));
-		const debugFilter = debug ? `,${drawTextFilter(h.word, tileFontSize)}` : '';
+		const debugText = h.person ? `${h.word} · ${h.person}` : h.word;
+		const debugFilter = debug ? `,${drawTextFilter(debugText, tileFontSize)}` : '';
 		videoParts.push(
 			`[${i}:v]trim=start=${wordStart.toFixed(3)}:end=${wordEnd.toFixed(3)},setpts=(PTS-STARTPTS)/${speed.toFixed(6)},scale=${tileW}:${tileH}:force_original_aspect_ratio=decrease,pad=${tileW}:${tileH}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,tpad=stop_mode=clone:stop=-1,trim=duration=${duration.toFixed(3)},setpts=PTS-STARTPTS${debugFilter}[v${i}]`,
 		);
@@ -231,6 +234,8 @@ export interface SupercutOptions {
 	tile?: boolean;
 	limit?: number | null;
 	debug?: boolean;
+	cast?: string[] | null;
+	onscreen?: boolean;
 	/** Bucket names to search. null or empty = all buckets. */
 	buckets?: string[] | null;
 	/**
@@ -318,7 +323,7 @@ function cutListFor(groups: Hit[][]): { clips: CutClip[]; captions: CutText[]; m
 		markers.push({
 			t: rec,
 			name: g.length === 1 ? `hit ${i + 1}/${groups.length}` : `tile x${g.length} ${i + 1}/${groups.length}`,
-			note: g.map((h) => `${clipId(h.video)} ${h.start.toFixed(2)}`).join(', '),
+			note: g.map((h) => `${clipId(h.video)} ${h.start.toFixed(2)}${h.person ? ` · ${h.person} asd ${(h.asd ?? 0).toFixed(2)}` : ''}`).join(', '),
 		});
 		rec += rendered;
 	}
@@ -332,6 +337,8 @@ export async function buildSupercut(opts: SupercutOptions): Promise<SupercutResu
 	const limit = opts.limit ?? null;
 	const debug = opts.debug ?? false;
 	const dryRun = opts.dryRun ?? false;
+	const cast = opts.cast ?? null;
+	const onscreen = opts.onscreen ?? false;
 	const onLog = opts.onLog ?? (() => {});
 	const signal = opts.signal;
 
@@ -345,14 +352,19 @@ export async function buildSupercut(opts: SupercutOptions): Promise<SupercutResu
 	if (regex) onLog(`Searching for regex ${regex}`);
 	else onLog(`Searching for "${target}"`);
 
-	const hits = await collectHits({
+	let hits = await collectHits({
 		target,
 		regex,
 		buckets: buckets.map((b) => b.name),
 		onLog,
 	});
+	hits = await attributeHits(hits, { cast, onscreen, onLog, signal });
 	onLog(`Total hits: ${hits.length}`);
-	if (hits.length === 0) throw new Error('No hits found');
+	if (hits.length === 0) {
+		if (!cast?.length && !onscreen) throw new Error('No hits found');
+		const restriction = [cast?.length ? `by ${cast.join(', ')}` : '', onscreen ? '(on-screen)' : ''].filter(Boolean).join(' ');
+		throw new Error(`No hits found for ${regex ? String(regex) : `"${target}"`}${restriction ? ` ${restriction}` : ''}`);
+	}
 
 	let groups: Hit[][];
 	let tiledSegments = 0;
@@ -395,6 +407,7 @@ export async function buildSupercut(opts: SupercutOptions): Promise<SupercutResu
 	const slug = regex
 		? `regex-${slugify(regex.source) || 'pattern'}`.slice(0, 60)
 		: slugify(target);
+	const castSuffix = cast?.length ? `-${slugify(cast[0].replace(/[\/_]+/g, ' '))}` : '';
 
 	await mkdir(outDir, { recursive: true });
 	const workDir = join(outDir, `.tmp-${slug}-${Date.now()}`);
@@ -425,7 +438,7 @@ export async function buildSupercut(opts: SupercutOptions): Promise<SupercutResu
 		const stamp = timestampSuffix();
 		const suffix = `${tile ? '-tiled' : ''}${debug ? '-debug' : ''}`;
 		const bucketTag = buckets.length > 1 ? 'mixed' : buckets[0].name;
-		const outFile = join(outDir, `${slug}-supercut${suffix}-${bucketTag}-${stamp}.mp4`);
+		const outFile = join(outDir, `${slug}${castSuffix}-supercut${suffix}-${bucketTag}-${stamp}.mp4`);
 		onLog(`Concatenating ${segments.length} segments -> ${outFile}`);
 		await concatSegments(segments, outFile, workDir, onLog, signal);
 

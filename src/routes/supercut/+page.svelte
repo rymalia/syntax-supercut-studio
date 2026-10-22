@@ -1,6 +1,7 @@
 <script lang="ts">
 	import JobPanel from '$lib/JobPanel.svelte';
 	import BucketPicker from '$lib/BucketPicker.svelte';
+	import CastPicker from '$lib/CastPicker.svelte';
 	import RegexTips from '$lib/RegexTips.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -15,6 +16,8 @@
 	let limit = $state(100);
 	let submitting = $state(false);
 	let buckets: string[] = $state([]);
+	let cast = $state<string[]>([]);
+	let onscreen = $state(false);
 
 	// AI mode state
 	let aiPrompt = $state('');
@@ -67,6 +70,8 @@
 				dryRun,
 				limit: useLimit ? limit : null,
 				buckets,
+				cast: cast.length ? cast : null,
+				onscreen,
 			};
 			if (mode === 'phrase') body.target = target.trim();
 			else if (mode === 'regex') body.regexSource = regexSource.trim();
@@ -105,6 +110,12 @@
 		<h3>Parameters</h3>
 
 		<BucketPicker bind:selected={buckets} />
+		<CastPicker bind:cast emptyLabel="Every speaker" hint="Optional. Keep only hits spoken by one person or a named group." />
+		<label class="field-check">
+			<input type="checkbox" bind:checked={onscreen} />
+			On-screen speaker only
+		</label>
+		<div class="help">Cast and on-screen use the engine's speaker data, so they only work on the talking-heads buckets; hits from other buckets are dropped (see the log).</div>
 
 		<div class="row" style="gap: 2rem;">
 			<label class="field-check">

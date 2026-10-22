@@ -1,42 +1,17 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import JobPanel from '$lib/JobPanel.svelte';
-	import PersonGrid, { type Person } from '../film/PersonGrid.svelte';
+	import CastPicker from '$lib/CastPicker.svelte';
 
 	let sentence = $state('');
 	let captions = $state(true);
 	let draft = $state(false);
 	let cast = $state<string[]>([]);
-	let people = $state<Person[]>([]);
-	let names = $state<Record<string, string[]>>({});
-	let picker: HTMLDialogElement | null = $state(null);
 	let submitting = $state(false);
 	let failure = $state('');
 
 	const jobId = $derived($page.url.searchParams.get('job'));
-
-	onMount(async () => {
-		try {
-			const res = await fetch('/api/engine/people');
-			if (!res.ok) throw new Error(await res.text());
-			const data = await res.json();
-			people = data.people ?? [];
-			names = data.names ?? {};
-		} catch (err) {
-			failure = `Could not load the cast picker: ${err instanceof Error ? err.message : String(err)}`;
-		}
-	});
-
-	function chooseCast(value: string) {
-		cast = [value];
-		picker?.close();
-	}
-
-	function clearCast() {
-		cast = [];
-	}
 
 	async function submit(e: Event) {
 		e.preventDefault();
@@ -73,7 +48,6 @@
 	<h1><mark>Sentence</mark> mashup.</h1>
 	<p class="muted">Build one coherent monologue line from the talking-heads engine corpus.</p>
 </section>
-
 {#if failure}<p role="alert">{failure}</p>{/if}
 
 <section class="split">
@@ -96,21 +70,7 @@
 			</div>
 		</div>
 
-		<div class="field">
-			<span class="caps">Cast restriction</span>
-			<div class="row">
-				{#if cast.length}
-					<span class="tag">{cast[0]}</span>
-					<button type="button" class="btn-ghost btn-small" onclick={clearCast}>Clear cast</button>
-				{:else}
-					<span class="muted">Automatic casting</span>
-				{/if}
-				<button type="button" class="btn-ghost btn-small" onclick={() => picker?.showModal()}>
-					Choose person or group
-				</button>
-			</div>
-			<div class="help">Optional. Restrict the engine to one person or a named group.</div>
-		</div>
+		<CastPicker bind:cast />
 
 		<div class="row">
 			<label class="field-check"><input type="checkbox" bind:checked={captions} /> Captions</label>
@@ -128,26 +88,3 @@
 		<JobPanel {jobId} />
 	</div>
 </section>
-
-<dialog bind:this={picker} class="person-dialog">
-	<div class="row" style="justify-content: space-between;">
-		<h3>Choose cast</h3>
-		<button type="button" class="btn-ghost btn-small" onclick={() => picker?.close()}>Close</button>
-	</div>
-	{#if people.length}
-		<PersonGrid {people} {names} onSelect={chooseCast} />
-	{:else}
-		<p class="help">No engine people are available yet.</p>
-	{/if}
-</dialog>
-
-<style>
-	.person-dialog {
-		background: var(--bg);
-		color: var(--ink);
-		border: 2px solid var(--ink);
-		width: min(90vw, 880px);
-		max-height: 85vh;
-		overflow: auto;
-	}
-</style>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import JobPanel from '$lib/JobPanel.svelte';
 	import BucketPicker from '$lib/BucketPicker.svelte';
+	import CastPicker from '$lib/CastPicker.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 
@@ -12,6 +13,8 @@
 	let noShift = $state(true);
 	let submitting = $state(false);
 	let buckets: string[] = $state([]);
+	let cast = $state<string[]>([]);
+	let onscreen = $state(false);
 
 	const jobId = $derived($page.url.searchParams.get('job'));
 
@@ -28,6 +31,8 @@
 				singleClip,
 				noShift,
 				buckets,
+				cast: cast.length ? cast : null,
+				onscreen,
 			};
 			const res = await fetch('/api/jobs', {
 				method: 'POST',
@@ -62,6 +67,12 @@
 		<h3>Parameters</h3>
 
 		<BucketPicker bind:selected={buckets} />
+		<CastPicker bind:cast emptyLabel="Every speaker" hint="Optional. Keep only hits spoken by one person or a named group." />
+		<label class="field-check">
+			<input type="checkbox" bind:checked={onscreen} />
+			On-screen speaker only
+		</label>
+		<div class="help">Cast and on-screen use the engine's speaker data, so they only work on the talking-heads buckets; hits from other buckets are dropped (see the log).</div>
 
 		<div class="field">
 			<label for="target">Target word</label>
