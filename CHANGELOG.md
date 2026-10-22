@@ -15,6 +15,10 @@ Changes are not sent upstream. Newest first; group entries by date.
 ## 2026-10-21
 
 ### Added
+- **Engine renders on `/clips`.** Sentence and film renders in the engine's
+  `films/out` (drafts tagged) are listed under an "engine renders" tab, play in
+  the page, and export for Resolve even after a server restart. A render whose
+  plan was rewritten after it was made says so instead of offering export.
 - **Export for Resolve.** Supercut, sentence and film renders can be opened as
   a DaVinci Resolve (or Final Cut) timeline cut from the original source files.
   Supercut now saves a cut list (`<render>.cuts.json`) beside each mp4, and an
