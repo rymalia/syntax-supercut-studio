@@ -15,6 +15,12 @@ Changes are not sent upstream. Newest first; group entries by date.
 ## 2026-10-21
 
 ### Added
+- **Cast and on-screen filters for supercut and songify.** Both pages can keep
+  only hits spoken by one person or a `people.json` group (the same picker as
+  `/sentence`) and only speech where the speaker is on screen. Phrase and regex
+  matching are unchanged; the talking-heads engine's new `attribute` command
+  says who speaks each hit, so the job log lists the speakers and the cut list
+  markers carry the person. The filters work on the talking-heads buckets.
 - **Engine renders on `/clips`.** Sentence and film renders in the engine's
   `films/out` (drafts tagged) are listed under an "engine renders" tab, play in
   the page, and export for Resolve even after a server restart. A render whose
