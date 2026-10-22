@@ -4,6 +4,16 @@ import { basename, join, resolve as resolvePath } from 'node:path';
 import { spawn } from 'node:child_process';
 import { resolveBuckets, PITCH_CACHE_FILE } from '../paths.js';
 import { runFfmpeg, atempoChain, throwIfAborted, CancelledError, type LogFn } from '../ffmpeg.js';
+import {
+	concatSegments,
+	frameCountForDuration,
+	renderedDuration,
+	renderSegments,
+	SEGMENT_AUDIO_RATE,
+	segmentAudioFilter,
+	segmentEncodeArgs,
+	type RenderSegment,
+} from '../render.js';
 import { slugify, timestampSuffix, type Hit } from '../text.js';
 import { collectHits } from '../hits.js';
 import { clipId, writeCutList, type CutClip, type CutMarker } from '../cutlist.js';
@@ -192,23 +202,25 @@ async function renderNote(
 ): Promise<void> {
 	const semitoneShift = targetMidi - hit.pitchMidi;
 	const pitchRatio = Math.pow(2, semitoneShift / 12);
-	const origAudioRate = 48000;
+	const origAudioRate = SEGMENT_AUDIO_RATE;
 	const shiftedRate = Math.round(origAudioRate * pitchRatio);
+	const actualPitchRatio = shiftedRate / origAudioRate;
 
 	const wordDur = hit.end - hit.start;
 	const segmentDur = Math.min(wordDur, noteSeconds);
+	const frameCount = frameCountForDuration(segmentDur);
 	const preRoll = Math.min(0.2, hit.start);
 	const inputStart = hit.start - preRoll;
 	const trimStart = preRoll;
 	const trimEnd = preRoll + segmentDur;
 
-	const videoFilter = `[0:v]trim=start=${trimStart.toFixed(3)}:end=${trimEnd.toFixed(3)},setpts=PTS-STARTPTS,scale=${CANVAS_W}:${CANVAS_H}:force_original_aspect_ratio=decrease,pad=${CANVAS_W}:${CANVAS_H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v]`;
+	const videoFilter = `[0:v]trim=start=${trimStart.toFixed(3)}:end=${trimEnd.toFixed(3)},setpts=PTS-STARTPTS,scale=${CANVAS_W}:${CANVAS_H}:force_original_aspect_ratio=decrease,pad=${CANVAS_W}:${CANVAS_H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,tpad=stop_mode=clone:stop=-1[v]`;
 
 	const noShift = Math.abs(semitoneShift) < 0.01;
 	const pitchChain = noShift
 		? ''
-		: `,asetrate=${shiftedRate},aresample=${origAudioRate},${atempoChain(1 / pitchRatio)}`;
-	const audioFilter = `[0:a]atrim=start=${trimStart.toFixed(3)}:end=${trimEnd.toFixed(3)},asetpts=PTS-STARTPTS${pitchChain},atrim=duration=${segmentDur.toFixed(3)},asetpts=PTS-STARTPTS[a]`;
+		: `,aresample=${origAudioRate},asetrate=${shiftedRate},aresample=${origAudioRate},${atempoChain(1 / actualPitchRatio)}`;
+	const audioFilter = `[0:a]atrim=start=${trimStart.toFixed(3)}:end=${trimEnd.toFixed(3)},asetpts=PTS-STARTPTS${pitchChain},atrim=duration=${segmentDur.toFixed(3)},asetpts=PTS-STARTPTS,${segmentAudioFilter(frameCount)}[a]`;
 
 	await runFfmpeg(
 		[
@@ -222,24 +234,7 @@ async function renderNote(
 			'[v]',
 			'-map',
 			'[a]',
-			'-t',
-			segmentDur.toFixed(3),
-			'-c:v',
-			'libx264',
-			'-preset',
-			'veryfast',
-			'-crf',
-			'20',
-			'-pix_fmt',
-			'yuv420p',
-			'-c:a',
-			'aac',
-			'-ar',
-			String(origAudioRate),
-			'-ac',
-			'2',
-			'-b:a',
-			'192k',
+			...segmentEncodeArgs(frameCount),
 			outPath,
 		],
 		onLog,
@@ -352,11 +347,12 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 		if (octaveShift !== 0) onLog(`Auto-transposing melody by ${octaveShift} octave(s)`);
 		const transposedMelody = melody.map((m) => m + octaveShift * 12);
 
-		const clipPaths: string[] = [];
 		// Cut list: each note is its word at the source's own speed. The cut list has
 		// no pitch field, so each note's shift goes in its name and marker for the editor.
 		const cutClips: CutClip[] = [];
 		const cutMarkers: CutMarker[] = [];
+		const segments: RenderSegment[] = [];
+		const effectiveTargets: number[] = [];
 		let rec = 0;
 		for (let i = 0; i < transposedMelody.length; i++) {
 			throwIfAborted(signal);
@@ -373,11 +369,13 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 				);
 				effectiveTarget = pick.pitchMidi + clampedShift;
 			}
-			const clipPath = join(workDir, `note-${String(i).padStart(4, '0')}.mp4`);
-			await renderNote(pick, effectiveTarget, noteSeconds, clipPath, onLog, signal);
-			clipPaths.push(clipPath);
 
 			const segmentDur = Math.min(pick.end - pick.start, noteSeconds);
+			effectiveTargets.push(effectiveTarget);
+			segments.push({
+				path: join(workDir, `note-${String(i).padStart(4, '0')}.mov`),
+				frameCount: frameCountForDuration(segmentDur),
+			});
 			const semitones = effectiveTarget - pick.pitchMidi;
 			const shiftLabel = Math.abs(semitones) < 0.01 ? '0 st' : `${semitones > 0 ? '+' : ''}${semitones.toFixed(2)} st`;
 			cutClips.push({ video: pick.video, rec, in: pick.start, out: pick.start + segmentDur, name: `${pick.word} ${shiftLabel}` });
@@ -386,57 +384,29 @@ export async function buildSong(opts: SongifyOptions): Promise<SongifyResult> {
 				name: `note ${i + 1}/${transposedMelody.length} ${midiToName(effectiveTarget)}`,
 				note: `${clipId(pick.video)} ${pick.start.toFixed(2)}; pitch ${shiftLabel} (${midiToName(pick.pitchMidi)} -> ${midiToName(effectiveTarget)})`,
 			});
-			rec += segmentDur;
+			rec += renderedDuration(segmentDur);
 		}
+		await renderSegments(
+			picks.map((pick, i) => async (renderSignal, segmentLog) => {
+				segmentLog('note');
+				await renderNote(
+					pick,
+					effectiveTargets[i],
+					noteSeconds,
+					segments[i].path,
+					segmentLog,
+					renderSignal,
+				);
+				return segments[i];
+			}),
+			{ onLog, signal },
+		);
 
 		const stamp = timestampSuffix();
 		const bucketTag = buckets.length > 1 ? 'mixed' : buckets[0].name;
 		const outFile = join(outDir, `${slug}-song-${bucketTag}-${stamp}.mp4`);
 		onLog(`Concatenating -> ${outFile}`);
-
-		const inputArgs: string[] = [];
-		for (const p of clipPaths) inputArgs.push('-i', p);
-		const labels = clipPaths.map((_, i) => `[${i}:v:0][${i}:a:0]`).join('');
-		const filterScript = `${labels}concat=n=${clipPaths.length}:v=1:a=1[outv][outa]`;
-		const filterFile = join(workDir, 'concat-filter.txt');
-		await writeFile(filterFile, filterScript);
-
-		await runFfmpeg(
-			[
-				...inputArgs,
-				'-/filter_complex',
-				filterFile,
-				'-map',
-				'[outv]',
-				'-map',
-				'[outa]',
-				'-c:v',
-				'libx264',
-				'-preset',
-				'veryfast',
-				'-crf',
-				'20',
-				'-pix_fmt',
-				'yuv420p',
-				'-r',
-				'30',
-				'-fps_mode',
-				'cfr',
-				'-c:a',
-				'aac',
-				'-ar',
-				'48000',
-				'-ac',
-				'2',
-				'-b:a',
-				'192k',
-				'-movflags',
-				'+faststart',
-				outFile,
-			],
-			onLog,
-			signal,
-		);
+		await concatSegments(segments, outFile, workDir, onLog, signal);
 
 		// The render's cut list, for editor export. A failure here shouldn't lose the render.
 		let cutsFile: string | null = null;

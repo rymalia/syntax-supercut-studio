@@ -35,6 +35,7 @@ External runtime deps: `ffmpeg` 7+ on `PATH` (all rendering; pipelines use the `
 - `PARAKEET_MLX_BIN` — local parakeet-mlx executable (default `~/.local/bin/parakeet-mlx`).
 - `SYNTAX_PARAKEET_MODEL` — model passed to parakeet-mlx as `--model` (default `mlx-community/parakeet-tdt-0.6b-v3`, multilingual). The app ignores a shell-wide `PARAKEET_MODEL`.
 - `SYNTAX_TRANSCRIBE_FALLBACK` — local transcription fallback: `xai` (default) or `none`.
+- `SYNTAX_RENDER_CONCURRENCY` — maximum parallel supercut/songify segment renders (default `4`, minimum `1`).
 
 ## Architecture
 
@@ -51,6 +52,7 @@ SvelteKit (Svelte 5 runes) single-user local app. All heavy work is server-side 
 Long-running work (render, ingest) goes through this job flow; quick queries may call a pipeline or the engine synchronously from their own route (e.g. `api/engine/check`, `api/engine/grep`). Adding a new job kind means touching: the pipeline module, the `JobKind`/`Job` union and a `start*` in `jobs.ts`, a `case` in `api/jobs/+server.ts`, and a route page.
 
 **Shared render helpers**:
+- `render.ts` — shared segment encode settings, bounded parallel segment rendering, and concat-demuxer joins for supercut and songify.
 - `hits.ts` `collectHits` — scans transcripts for a phrase (token-wise match after `text.ts` `normalize`) or a regex (matched against words joined by single spaces, then mapped back to word timings). Used by supercut and songify.
 - `drawtext.ts` — ffmpeg `drawtext` filter for debug overlays; its quoting follows ffmpeg's `av_get_token` rules (see comments; a past bug fix was here).
 - `ffmpeg.ts` `atempoChain` — chains `atempo` stages since each is limited to 0.5–2.0.

@@ -27,6 +27,20 @@ Changes are not sent upstream. Newest first; group entries by date.
   pitch shifts from the timeline file, so each note's shift (in semitones) is in
   its clip name and marker for applying by hand.
 
+### Changed
+- **Faster supercut and songify renders.** Segments render four at a time
+  (`SYNTAX_RENDER_CONCURRENCY`), and the final join copies the video instead of
+  encoding it again, so renders take about a quarter of the time (a 120-clip
+  supercut: 33 s → 8 s) with one less generation of compression. Every cut is
+  now a whole number of frames with sound exactly in sync; the old join padded
+  each cut to its audio, adding duplicated frames and timing slack, so the same
+  edit runs slightly shorter. Cut lists follow the rendered timing.
+
+### Fixed
+- **Songify pitch rate.** Resampling to 48 kHz before pitch shifting fixes the
+  ~1.5-semitone sharpness caused by 44.1 kHz sources; tempo correction now uses
+  the actual rounded-rate ratio.
+
 ## 2026-10-17
 
 ### Added

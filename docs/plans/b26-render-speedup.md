@@ -84,3 +84,25 @@ differences, not random ones.
   - A **synthetic absolute test**: generated sources whose frames carry their frame number and
     whose audio encodes the source time, run through supercut. It measures true A/V offset at
     every join, independent of the old render.
+
+## As built (2026-10-21)
+
+- Intermediates are **MOV** (H.264 at a 1/15360 timescale + `pcm_s16le`), not MKV: MKV's 1 ms timebase
+  rounded frame times (0.067, 0.134 s …) and the first build's output started at 0.067 s video /
+  0.046 s audio. The join keeps timestamps unshifted, so both streams start at 0 with exact 1/30 s frames.
+- The concat list holds relative basenames in the work dir (no quoting, so `'` in a target is fine).
+- Cut list `rec` advances by the rendered duration (`N/30`), matching the mp4.
+- Results (A/B harness, 5 real-media edits; scratchpad scripts `ab/ab.sh`, `ab/absolute.py`,
+  `ab/synth/`):
+  - Speed at concurrency 4: tiled 15 segments 4.8 → 1.8 s; solo 120 segments 32.8 → 8.3 s;
+    regex 40 segments 7.0 → 2.4 s; tiled 60 segments 19.9 → 5.3 s; songify 2.9 → 1.0 s.
+  - Absolute check against the sources (solo and tiled supercuts): output frame count = ΣN,
+    every segment's video at frame shift 0, audio-minus-video offset 0.00 ms (max 0.02) on all
+    segments with a reliable audio match.
+  - Old vs new comparison is not like for like: the old concat filter extended each segment to its
+    AAC audio length, adding frames (120-segment edit: 1610 vs 1576 frames).
+  - Synthetic sources (30/29.97/25/23.976/60 fps; H.264, VP9, AV1; 48 and 44.1 kHz): both start at 0,
+    no gaps. Per-source median offsets are near 0 for 30 and 60 fps sources in the new render
+    (old: +9 and +19 ms). Other rates spread by about half a source frame in both.
+  - Cancel mid-render: `CancelledError`, no work dir, no ffmpeg left. A corrupt source: the original
+    ffmpeg error, siblings stopped and awaited, no leftovers.
